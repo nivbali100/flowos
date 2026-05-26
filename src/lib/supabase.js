@@ -5,9 +5,12 @@
 import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL  || 'https://lgvncozlqtbaxbkdjmms.supabase.co'
-const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON || ''
+const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON || null
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON)
+// Only initialize Supabase if we have a valid key — avoids crash when deployed without env vars
+export const supabase = SUPABASE_ANON
+  ? createClient(SUPABASE_URL, SUPABASE_ANON)
+  : null
 
 // ─── Week Summary ─────────────────────────────────────────────────────────────
 
@@ -16,6 +19,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON)
  * Fire-and-forget — never blocks UI.
  */
 export async function syncWeekSummary(summary, coachProfile) {
+  if (!supabase) return
   try {
     // Compute a simple score: 40% completion + 30% big3 + 30% no-stuck bonus
     const completionScore = (summary.completionPct || 0) * 0.4
@@ -58,6 +62,7 @@ export async function syncWeekSummary(summary, coachProfile) {
  * Called on Setup completion and whenever profile is updated.
  */
 export async function upsertCoach(profile) {
+  if (!supabase) return
   try {
     const row = {
       email:           profile.email,
@@ -87,7 +92,7 @@ export async function upsertCoach(profile) {
  * Called fire-and-forget whenever these are updated.
  */
 export async function syncGoalsToSupabase(coachEmail, { quarterly, monthly, annualGoals } = {}) {
-  if (!coachEmail) return
+  if (!supabase || !coachEmail) return
   try {
     const update = {}
     if (quarterly)   update.quarterly_goals = quarterly
@@ -109,6 +114,7 @@ export async function syncGoalsToSupabase(coachEmail, { quarterly, monthly, annu
  * Fetch all coaches from the registry.
  */
 export async function fetchCoaches() {
+  if (!supabase) return []
   try {
     const { data, error } = await supabase
       .from('flowos_coaches')
@@ -129,6 +135,7 @@ export async function fetchCoaches() {
  * Stored in Supabase — coach's app polls and displays it.
  */
 export async function sendCoachPush({ fromEmail, toEmail, message, taskTitle = null }) {
+  if (!supabase) return false
   try {
     const { error } = await supabase.from('flowos_coach_push').insert({
       from_email: fromEmail,
@@ -149,7 +156,7 @@ export async function sendCoachPush({ fromEmail, toEmail, message, taskTitle = n
  * Returns the latest unread message, or null.
  */
 export async function fetchUnreadPush(coachEmail) {
-  if (!coachEmail) return null
+  if (!supabase || !coachEmail) return null
   try {
     const { data, error } = await supabase
       .from('flowos_coach_push')
@@ -170,6 +177,7 @@ export async function fetchUnreadPush(coachEmail) {
  * Mark a push message as read.
  */
 export async function markPushRead(pushId) {
+  if (!supabase) return
   try {
     await supabase
       .from('flowos_coach_push')
@@ -186,6 +194,7 @@ export async function markPushRead(pushId) {
  * Fetch all coach week summaries (for admin dashboard).
  */
 export async function fetchCoachSummaries() {
+  if (!supabase) return []
   try {
     const { data, error } = await supabase
       .from('flowos_week_summaries')
@@ -204,6 +213,7 @@ export async function fetchCoachSummaries() {
  * Fetch all recent weekly form submissions (for admin dashboard).
  */
 export async function fetchAllWeeklyForms() {
+  if (!supabase) return []
   try {
     const { data, error } = await supabase
       .from('flowos_weekly_forms')
@@ -224,7 +234,7 @@ export async function fetchAllWeeklyForms() {
  * Fire-and-forget — never blocks UI.
  */
 export async function syncTaskToSupabase(task, coachEmail) {
-  if (!coachEmail || !task?.id) return
+  if (!supabase || !coachEmail || !task?.id) return
   try {
     const row = {
       coach_email:       coachEmail,
@@ -259,7 +269,7 @@ export async function syncTaskToSupabase(task, coachEmail) {
  * Delete a task from Supabase (called on hard delete).
  */
 export async function deleteTaskFromSupabase(taskId, coachEmail) {
-  if (!coachEmail || !taskId) return
+  if (!supabase || !coachEmail || !taskId) return
   try {
     await supabase
       .from('flowos_tasks')
@@ -276,6 +286,7 @@ export async function deleteTaskFromSupabase(taskId, coachEmail) {
  * Returns a Map<email, taskStats> for O(1) lookup.
  */
 export async function fetchAllTraineeTasks() {
+  if (!supabase) return new Map()
   try {
     const { data, error } = await supabase
       .from('flowos_tasks')
@@ -308,7 +319,7 @@ export async function fetchAllTraineeTasks() {
  * Returns array mapped to FlowOS task shape, empty on error.
  */
 export async function fetchTasksForCoach(coachEmail) {
-  if (!coachEmail) return []
+  if (!supabase || !coachEmail) return []
   try {
     const { data, error } = await supabase
       .from('flowos_tasks')
@@ -352,6 +363,7 @@ export async function fetchTasksForCoach(coachEmail) {
  * Fetch latest weekly form data for a specific coach (from n8n).
  */
 export async function fetchLatestFormData(coachEmail) {
+  if (!supabase) return null
   try {
     const { data, error } = await supabase
       .from('flowos_weekly_forms')
