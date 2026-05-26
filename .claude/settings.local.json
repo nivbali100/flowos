@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(npm run:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174)",
+      "Bash(brew install:*)",
+      "Bash(ffmpeg -version)",
+      "Bash(npm install:*)",
+      "Bash(node server/index.js)",
+      "Bash(curl -s http://localhost:3001/api/jobs)",
+      "Bash(node /Users/nivbali/zoom-analysis/server/index.js)",
+      "Bash(pkill -f \"zoom-analysis/server/index.js\")",
+      "Bash(pkill -f \"node.*zoom-analysis\")",
+      "Bash(node --env-file=/Users/nivbali/zoom-analysis/.env /Users/nivbali/zoom-analysis/server/index.js)",
+      "Bash(node --env-file=/Users/nivbali/zoom-analysis/.env -e \"console.log\\(process.env.ANTHROPIC_API_KEY ? 'OK' : 'MISSING'\\)\")",
+      "Bash(xxd /Users/nivbali/zoom-analysis/.env)"
+    ]
+  }
+}
