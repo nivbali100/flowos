@@ -169,10 +169,10 @@ export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onT
       ].filter(Boolean).join(' ')}
     >
       {/* Priority strip — top accent bar */}
-      <div className={`h-1 w-full ${priorityStripColor}`} />
+      <div className={`h-0.5 md:h-1 w-full ${priorityStripColor}`} />
 
       {/* Card body */}
-      <div className="px-3 pt-2.5 pb-3 space-y-2.5">
+      <div className="px-2.5 pt-2 pb-2 md:px-3 md:pt-2.5 md:pb-3 space-y-1.5 md:space-y-2.5">
 
         {/* Focus mode exit strip — only visible when this card is focused */}
         {isFocused && (
@@ -377,8 +377,28 @@ export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onT
           return null
         })()}
 
-        {/* Action buttons — redesigned with primary/secondary layout */}
-        <div className="flex items-center gap-2 pt-1 flex-wrap">
+        {/* Mobile: compact action strip — one primary action + move + delete */}
+        <div className="flex md:hidden items-center gap-1.5 pt-0.5">
+          {isBacklog && <button onClick={e => { e.stopPropagation(); onMove(task.id, 'today') }} className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-white">להיום →</button>}
+          {isWeek    && <button onClick={e => { e.stopPropagation(); onMove(task.id, 'doing') }} className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-purple-600 text-white">⚡ התחל</button>}
+          {isToday   && <button onClick={e => { e.stopPropagation(); onMove(task.id, 'done')  }} className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-green-500 text-white">✓ בוצע</button>}
+          {isDoing   && <button onClick={e => { e.stopPropagation(); onMove(task.id, 'done')  }} className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-green-500 text-white">✓ סגור</button>}
+          {isDone    && <button onClick={e => { e.stopPropagation(); onMove(task.id, 'backlog')}} className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">↩ פתח</button>}
+          {!isDone && onMobileMove && (
+            <button onClick={e => { e.stopPropagation(); onMobileMove(task.id) }} className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-brand-500 hover:border-brand-200 transition-colors">
+              <ArrowLeftRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <button onClick={e => { e.stopPropagation(); setConfirmDelete(c => !c) }} className="p-1.5 rounded-lg text-slate-300 hover:text-red-400 transition-colors">
+            {confirmDelete ? <X className="w-3.5 h-3.5 text-red-400" /> : <Trash2 className="w-3.5 h-3.5" />}
+          </button>
+          {confirmDelete && (
+            <button onClick={e => { e.stopPropagation(); onDelete(task.id) }} className="px-2 py-1.5 rounded-lg text-xs font-bold bg-red-500 text-white">מחק</button>
+          )}
+        </div>
+
+        {/* Desktop: full action buttons layout */}
+        <div className="hidden md:flex items-center gap-2 pt-1 flex-wrap">
           {/* PRIMARY button */}
           {isBacklog && (
             <button onClick={e => { e.stopPropagation(); onMove(task.id, 'today') }}
@@ -450,17 +470,6 @@ export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onT
             <button onClick={e => { e.stopPropagation(); onMove(task.id, 'today') }}
               className="min-h-[44px] py-2 px-3 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors">
               ⏸ פאוז
-            </button>
-          )}
-
-          {/* Mobile: quick column picker button */}
-          {!isDone && onMobileMove && (
-            <button
-              onClick={e => { e.stopPropagation(); onMobileMove(task.id) }}
-              className="md:hidden p-2.5 text-slate-400 hover:text-brand-500 rounded-xl hover:bg-brand-50 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-              title="העבר לעמודה"
-            >
-              <ArrowLeftRight className="w-4 h-4" />
             </button>
           )}
 

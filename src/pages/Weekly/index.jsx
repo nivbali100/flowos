@@ -1856,56 +1856,37 @@ export default function Weekly() {
             {COLUMNS.map(col => <Column key={col.id} col={col} {...colProps} />)}
           </div>
 
-          {/* Mobile: horizontal scroll — all 5 columns visible, swipe between them */}
-          <div className="md:hidden -mx-4 px-4">
-            {/* Scroll hint dots — with column label + accent color */}
-            <div className="flex items-center gap-2 mb-3 justify-center">
-              {COLUMNS.map(col => (
-                <button
-                  key={col.id}
-                  onClick={() => {
-                    document.getElementById(`col-${col.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
-                    setActiveTab(col.id)
-                  }}
-                  className={`transition-all duration-200 flex items-center justify-center rounded-full ${
-                    activeTab === col.id
-                      ? `h-6 px-2.5 ${col.tagBg} text-[10px] font-black gap-1`
-                      : 'w-2 h-2 bg-slate-200 hover:bg-slate-300'
-                  }`}
-                  title={col.label}
-                >
-                  {activeTab === col.id && <><span className="text-[11px] leading-none">{col.emoji}</span> {col.label}</>}
-                </button>
-              ))}
+          {/* Mobile: single-column tab view — no horizontal scroll, drag works natively */}
+          <div className="md:hidden">
+            {/* Column tab bar */}
+            <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 mb-3 gap-0.5">
+              {COLUMNS.map(col => {
+                const count = displayTasks.filter(t => t.status === col.id).length
+                return (
+                  <button
+                    key={col.id}
+                    onClick={() => setActiveTab(col.id)}
+                    className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-lg transition-all duration-150 ${
+                      activeTab === col.id
+                        ? `${col.tagBg} shadow-sm`
+                        : 'text-slate-400 hover:text-slate-600'
+                    }`}
+                  >
+                    <span className="text-base leading-none">{col.emoji}</span>
+                    <span className={`text-[9px] font-black mt-0.5 ${activeTab === col.id ? '' : 'text-slate-400'}`}>{col.label}</span>
+                    {count > 0 && (
+                      <span className={`text-[8px] font-bold rounded-full px-1 mt-0.5 ${activeTab === col.id ? 'bg-white/60' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
-            {/* Horizontal scroll container — locked during drag so touch isn't stolen */}
-            <div
-              className={`flex gap-3 snap-x snap-mandatory pb-4 scroll-smooth ${activeDragId ? 'overflow-x-hidden touch-none' : 'overflow-x-auto'}`}
-              style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
-              onScroll={e => {
-                // Update active tab based on which column is most visible
-                const container = e.currentTarget
-                const children = [...container.querySelectorAll('[data-col]')]
-                let closest = null, minDist = Infinity
-                children.forEach(el => {
-                  const rect = el.getBoundingClientRect()
-                  const dist = Math.abs(rect.left + rect.width / 2 - window.innerWidth / 2)
-                  if (dist < minDist) { minDist = dist; closest = el }
-                })
-                if (closest) setActiveTab(closest.getAttribute('data-col'))
-              }}
-            >
-              {COLUMNS.map(col => (
-                <div
-                  key={col.id}
-                  id={`col-${col.id}`}
-                  data-col={col.id}
-                  className="snap-center shrink-0 w-[82vw] max-w-[340px]"
-                >
-                  <Column col={col} {...colProps} />
-                </div>
-              ))}
-            </div>
+            {/* Active column — full width, drag works without carousel interference */}
+            {COLUMNS.map(col => (
+              <div key={col.id} className={col.id === activeTab ? '' : 'hidden'}>
+                <Column col={col} {...colProps} />
+              </div>
+            ))}
           </div>
 
           {/* Ghost card shown while dragging */}
