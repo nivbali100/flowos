@@ -69,7 +69,7 @@ export default function Sidebar() {
   const isAdmin     = userEmail === ADMIN_EMAIL
 
   return (
-    <aside className="hidden md:flex flex-col w-60 bg-white border-l border-slate-200 h-screen sticky top-0">
+    <aside className="hidden md:flex flex-col w-60 bg-white border-r border-slate-200 h-screen sticky top-0" dir="rtl">
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 py-5 border-b border-slate-100">
         <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">

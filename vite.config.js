@@ -19,8 +19,8 @@ export default defineConfig({
         background_color: '#0b081c',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
-        scope: '/',
+        start_url: '/flowos/',
+        scope: '/flowos/',
         icons: [
           {
             src: 'favicon.svg',
@@ -31,6 +31,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: true,          // force new SW to activate immediately
+        clientsClaim: true,         // new SW takes control of all tabs right away
         // Cache all app assets for offline use
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // Cache Google Fonts
