@@ -1506,6 +1506,7 @@ export default function Weekly() {
   const [showMorning,    setShowMorning]   = useState(false)   // T2-C
   const [search,         setSearch]        = useState('')      // T2-A
   const [activeFilter,   setActiveFilter]  = useState('all')   // T2-A
+  const [showCelebration, setShowCelebration] = useState(false)
 
   // ── Undo Toast ──────────────────────────────────────────────────────────
   const [undoQueue,  setUndoQueue]  = useState([])
@@ -1552,6 +1553,10 @@ export default function Weekly() {
       touchCount:     task.touchCount,
     }
     handleMoveTask(id, newStatus)
+    if (newStatus === 'done') {
+      setShowCelebration(true)
+      setTimeout(() => setShowCelebration(false), 1800)
+    }
     const colLabel = COLUMNS.find(c => c.id === newStatus)?.label ?? newStatus
     pushUndo({
       message: `"${task.title.slice(0, 28)}" → ${colLabel}`,
@@ -1974,6 +1979,18 @@ export default function Weekly() {
 
       {/* Undo Toast — floats above bottom nav */}
       <UndoToast toasts={undoQueue} onUndo={applyUndo} onDismiss={dismissUndo} />
+
+      {/* ── Task completion celebration flash ── */}
+      {showCelebration && (
+        <div className="fixed inset-0 pointer-events-none z-[300] overflow-hidden">
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-8xl animate-bounce">✅</div>
+          </div>
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-2xl shadow-2xl font-black text-lg animate-slide-up">
+            +10 XP 🔥
+          </div>
+        </div>
+      )}
       </>
       )}
     </div>

@@ -60,7 +60,7 @@ export default function App() {
           }>
             <Route path="/rules"       element={<GameRules />} />
             <Route path="/onboarding"  element={<Onboarding />} />
-            <Route path="/"            element={<Journey />} />
+            <Route path="/"            element={<Navigate to="/weekly" replace />} />
             <Route path="/dashboard"   element={<Dashboard />} />
             <Route path="/goals"       element={<Goals />} />
             <Route path="/daily"       element={<Daily />} />

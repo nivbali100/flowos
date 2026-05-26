@@ -37,7 +37,7 @@ export default function AppShell() {
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50" dir="rtl">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto min-h-screen pb-20 md:pb-0">
+      <main className="flex-1 overflow-x-hidden overflow-y-auto min-h-screen pb-20 md:pb-0">
         <VisionBanner />
         {/* key forces remount on route change → triggers CSS enter animation */}
         <div key={location.pathname} className="animate-slide-up">

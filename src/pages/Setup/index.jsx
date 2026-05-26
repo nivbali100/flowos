@@ -38,6 +38,14 @@ function Input({ label, hint, value, onChange, type = 'text', placeholder = '' }
 }
 
 function CurrencyInput({ label, hint, value, onChange, placeholder = '0' }) {
+  const [raw, setRaw] = useState(value !== '' && value !== 0 ? String(value) : '')
+
+  function handleChange(e) {
+    const str = e.target.value.replace(/[^0-9]/g, '')  // digits only
+    setRaw(str)
+    onChange(str === '' ? '' : Number(str))
+  }
+
   return (
     <div className="space-y-1.5">
       <label className="block text-sm font-bold text-slate-700">{label}</label>
@@ -45,10 +53,10 @@ function CurrencyInput({ label, hint, value, onChange, placeholder = '0' }) {
       <div className="relative">
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">₪</span>
         <input
-          type="number"
-          min={0}
-          value={value}
-          onChange={e => onChange(Number(e.target.value))}
+          type="text"
+          inputMode="numeric"
+          value={raw}
+          onChange={handleChange}
           placeholder={placeholder}
           className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-4 py-3 pr-8 focus:outline-none focus:ring-2 focus:ring-brand-300"
         />
@@ -269,9 +277,9 @@ function Step1({ data, setData }) {
   return (
     <div className="space-y-5">
       <div className="text-center mb-6">
-        <div className="text-5xl mb-3">👋</div>
-        <h2 className="text-xl font-black text-slate-900">שמחים שאתה כאן</h2>
-        <p className="text-sm text-slate-500 mt-1">ספר לנו קצת עליך — 30 שניות</p>
+        <div className="text-5xl mb-3">🚀</div>
+        <h2 className="text-xl font-black text-slate-900">המסע שלך מתחיל עכשיו</h2>
+        <p className="text-sm text-slate-500 mt-1 leading-relaxed">עוד כמה דקות — ונבנה יחד את המפה לפסגה שלך</p>
       </div>
 
       {/* Name */}
@@ -358,6 +366,16 @@ function Step2({ data, setData }) {
         patterns={data.blockingPatterns}
         onChange={arr => setData(d => ({ ...d, blockingPatterns: arr }))}
       />
+
+      <div className="space-y-1.5">
+        <label className="block text-sm font-bold text-slate-700">⚡ מה עלול להפיל אותי?</label>
+        <p className="text-xs text-slate-400 leading-relaxed">מה התרחיש שבו אני עלול לעצור, לוותר, או לחזור אחורה?</p>
+        <textarea rows={3} value={data.derailmentRisk || ''}
+          onChange={e => setData(d => ({ ...d, derailmentRisk: e.target.value }))}
+          placeholder="לדוגמה: אם אפסיד 3 שיחות ברצף — אאבד ביטחון ואפסיק. או: אם לא אראה תוצאות תוך חודש — אוותר..."
+          className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-brand-200"
+        />
+      </div>
     </div>
   )
 }
@@ -370,6 +388,16 @@ function Step3({ data, setData, starting }) {
         <div className="text-5xl mb-3">🎯</div>
         <h2 className="text-xl font-black text-slate-900">חזון שנתי</h2>
         <p className="text-sm text-slate-500 mt-1">לאן אנחנו הולכים עד סוף השנה</p>
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="block text-sm font-bold text-slate-700">🌟 מה החזון שלי?</label>
+        <p className="text-xs text-slate-400 leading-relaxed">תאר בחופשיות — איפה תהיה בעוד שנה? איך ייראה החיים שלך?</p>
+        <textarea rows={3} value={data.visionText || ''}
+          onChange={e => setData(d => ({ ...d, visionText: e.target.value }))}
+          placeholder="בעוד שנה, אני... אני חי ב... הילדים שלי רואים אותי... אני מרגיש..."
+          className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-brand-200"
+        />
       </div>
 
       <CurrencyInput label="יעד הכנסות שנתי"
@@ -582,8 +610,9 @@ export default function Setup() {
     closingRate: '', runwayMonths: '', freeCashAmount: '',
     confidence: 7, clarity: 7,
     blockingPatterns: [''],
+    derailmentRisk: '',
   })
-  const [annual,    setAnnual]    = useState(draft?.annual    ?? { revenueTarget: '', identity: '', communityTarget: '' })
+  const [annual,    setAnnual]    = useState(draft?.annual    ?? { revenueTarget: '', identity: '', communityTarget: '', visionText: '' })
   const [quarterly, setQuarterly] = useState(draft?.quarterly ?? { revenueTarget: '', threeKeyMoves: ['', '', ''], habit: '' })
   const [monthly,   setMonthly]   = useState(draft?.monthly   ?? { revenueTarget: '', leadsTarget: '', callsTarget: '', threeKeyMoves: ['', '', ''] })
 
@@ -637,11 +666,13 @@ export default function Setup() {
         confidence:        starting.confidence,
         clarity:           starting.clarity,
         blockingPatterns:  cleanPatterns,
+        derailmentRisk:    (starting.derailmentRisk || '').trim(),
       },
       annualGoals: {
         revenueTarget:   Number(annual.revenueTarget) || 0,
         identity:        annual.identity.trim(),
         communityTarget: annual.communityTarget.trim(),
+        visionText:      (annual.visionText || '').trim(),
       },
     }
 
