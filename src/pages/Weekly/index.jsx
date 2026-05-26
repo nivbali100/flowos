@@ -758,10 +758,11 @@ function SortableTaskWrapper({ id, children }) {
   const style = {
     transform:   CSS.Transform.toString(transform ? { ...transform, scaleX: 1, scaleY: 1 } : null),
     transition:  isDragging ? undefined : (transition || undefined),
-    opacity:     isDragging ? 0 : 1,
+    opacity:     isDragging ? 0.4 : 1,
     zIndex:      isDragging ? 999 : 'auto',
     position:    'relative',
     touchAction: 'none',
+    boxShadow:   isDragging ? '0 8px 32px rgba(99,102,241,0.25)' : undefined,
   }
 
   return (
@@ -1886,9 +1887,7 @@ export default function Weekly() {
           </div>
 
           {/* Ghost card shown while dragging */}
-          <DragOverlay dropAnimation={{ duration: 180, easing: 'ease' }}>
-            {activeDragTask ? <DragGhost task={activeDragTask} /> : null}
-          </DragOverlay>
+          <DragOverlay dropAnimation={null} />
         </DndContext>
 
         <div className="h-8" />
