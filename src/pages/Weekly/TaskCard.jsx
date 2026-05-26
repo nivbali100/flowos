@@ -158,7 +158,7 @@ export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onT
       className={[
         // IMPORTANT: no transition-all — only transition specific non-transform props
         // transition-all would conflict with dnd-kit's CSS transform animation
-        'rounded-xl border overflow-hidden transition-[box-shadow,opacity,border-color] duration-200',
+        'group rounded-xl border overflow-hidden transition-[box-shadow,opacity,border-color] duration-200',
         cardBg, cardShadow, cardAnim,
         completing ? 'animate-complete-flash scale-[1.01]' : '',
         isDone ? 'opacity-55' : '',
@@ -192,16 +192,6 @@ export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onT
           {/* Drag handle — only this element initiates drag.
                dragHandleRef (setActivatorNodeRef) tells dnd-kit to measure drag
                offset from THIS element so the ghost appears under the cursor. */}
-          {dragListeners && (
-            <div
-              ref={dragHandleRef}
-              {...dragListeners}
-              className="shrink-0 cursor-grab active:cursor-grabbing touch-none -ml-0.5 text-slate-300 hover:text-slate-400 transition-colors min-h-[40px] min-w-[32px] flex items-center justify-center"
-              title="גרור"
-            >
-              <GripVertical className="w-4 h-4" />
-            </div>
-          )}
           {/* Quick-complete circle */}
           <button
             onClick={handleComplete}
@@ -290,6 +280,9 @@ export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onT
           )}
         </div>
 
+        {/* Details block — hidden by default on desktop, revealed on hover or focus/stuck/doing */}
+        <div className={`hidden md:block space-y-1.5 ${!isFocused && !isStuck && !isDoing ? 'md:hidden md:group-hover:block' : ''}`}>
+
         {/* Goal connection strip */}
         {!isDone && (
           task.goalRef ? (
@@ -377,6 +370,8 @@ export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onT
           return null
         })()}
 
+        </div>{/* end details block */}
+
         {/* Mobile: compact action strip — one primary action + move + delete */}
         <div className="flex md:hidden items-center gap-1.5 pt-0.5">
           {isBacklog && <button onClick={e => { e.stopPropagation(); onMove(task.id, 'today') }} className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-white">להיום →</button>}
@@ -397,8 +392,8 @@ export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onT
           )}
         </div>
 
-        {/* Desktop: full action buttons layout */}
-        <div className="hidden md:flex items-center gap-2 pt-1 flex-wrap">
+        {/* Desktop: full action buttons layout — hidden by default, shown on hover or when focused/doing/done */}
+        <div className={`items-center gap-2 pt-1 flex-wrap hidden ${isFocused || isDoing || isDone ? 'md:flex' : 'md:group-hover:flex'}`}>
           {/* PRIMARY button */}
           {isBacklog && (
             <button onClick={e => { e.stopPropagation(); onMove(task.id, 'today') }}

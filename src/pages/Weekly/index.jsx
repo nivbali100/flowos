@@ -750,18 +750,15 @@ function SortableTaskWrapper({ id, children }) {
     attributes,
     listeners,
     setNodeRef,
-    setActivatorNodeRef,   // ← ref for the drag handle: fixes ghost position offset
     transform,
     transition,
     isDragging,
   } = useSortable({ id })
 
   const style = {
-    // scaleX/Y:1 prevents aspect-ratio distortion during cross-column moves
     transform:  CSS.Transform.toString(transform ? { ...transform, scaleX: 1, scaleY: 1 } : null),
-    // Only apply dnd transition — never apply our own CSS transitions on the drag item
     transition: isDragging ? undefined : (transition || undefined),
-    opacity:    isDragging ? 0 : 1,   // hide original — DragOverlay ghost is shown instead
+    opacity:    isDragging ? 0 : 1,
     zIndex:     isDragging ? 999 : 'auto',
     position:   'relative',
   }
@@ -771,10 +768,11 @@ function SortableTaskWrapper({ id, children }) {
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className="select-none"
+      {...listeners}
+      className="select-none cursor-grab active:cursor-grabbing touch-none"
     >
       {typeof children === 'function'
-        ? children({ dragListeners: listeners, dragHandleRef: setActivatorNodeRef, isDragging })
+        ? children({ isDragging })
         : children}
     </div>
   )
@@ -969,7 +967,7 @@ function Column({ col, tasks, quarterly, monthly, period, onAdd, onMove, onDelet
           )}
           {colTasks.map(task => (
             <SortableTaskWrapper key={task.id} id={task.id}>
-              {({ dragListeners, dragHandleRef, isDragging }) => (
+              {({ isDragging }) => (
                 <>
                   {/* T2-D: selection checkbox overlay */}
                   {selectMode && (
@@ -993,8 +991,6 @@ function Column({ col, tasks, quarterly, monthly, period, onAdd, onMove, onDelet
                     onFocus={selectMode ? () => toggleSelect(task.id) : onFocus}
                     goalOptions={goalOptions}
                     isDragActive={isDragActive}
-                    dragListeners={dragListeners}
-                    dragHandleRef={dragHandleRef}
                     onMobileMove={onMobileMove}
                   />
                 </>
