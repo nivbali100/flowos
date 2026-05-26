@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: '/flowos/',
+  base: '/',
   plugins: [
     react(),
     VitePWA({
@@ -19,8 +19,8 @@ export default defineConfig({
         background_color: '#0b081c',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/flowos/',
-        scope: '/flowos/',
+        start_url: '/',
+        scope: '/',
         icons: [
           {
             src: 'favicon.svg',

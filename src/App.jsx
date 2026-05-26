@@ -38,7 +38,7 @@ function RequireSetup({ children }) {
 
 export default function App() {
   return (
-    <BrowserRouter basename="/flowos">
+    <BrowserRouter>
       <Suspense fallback={<PageLoader />}>
         <Routes>
 
