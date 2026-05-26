@@ -1,1 +1,191 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="48" height="46" fill="none" viewBox="0 0 48 46"><path fill="#863bff" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z" style="fill:#863bff;fill:color(display-p3 .5252 .23 1);fill-opacity:1"/><mask id="a" width="48" height="46" x="0" y="0" maskUnits="userSpaceOnUse" style="mask-type:alpha"><path fill="#000" d="M25.842 44.938c-.664.844-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.183c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.498 0-3.579-1.842-3.579H1.133c-.92 0-1.456-1.04-.92-1.787L9.91.473c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.578 1.842 3.578h11.377c.943 0 1.473 1.088.89 1.832L25.843 44.94z" style="fill:#000;fill-opacity:1"/></mask><g mask="url(#a)"><g filter="url(#b)"><ellipse cx="5.508" cy="14.704" fill="#ede6ff" rx="5.508" ry="14.704" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -4.47 31.516)"/></g><g filter="url(#c)"><ellipse cx="10.399" cy="29.851" fill="#ede6ff" rx="10.399" ry="29.851" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -39.328 7.883)"/></g><g filter="url(#d)"><ellipse cx="5.508" cy="30.487" fill="#7e14ff" rx="5.508" ry="30.487" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.814 -25.913 -14.639)scale(1 -1)"/></g><g filter="url(#e)"><ellipse cx="5.508" cy="30.599" fill="#7e14ff" rx="5.508" ry="30.599" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.814 -32.644 -3.334)scale(1 -1)"/></g><g filter="url(#f)"><ellipse cx="5.508" cy="30.599" fill="#7e14ff" rx="5.508" ry="30.599" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="matrix(.00324 1 1 -.00324 -34.34 30.47)"/></g><g filter="url(#g)"><ellipse cx="14.072" cy="22.078" fill="#ede6ff" rx="14.072" ry="22.078" style="fill:#ede6ff;fill:color(display-p3 .9275 .9033 1);fill-opacity:1" transform="rotate(93.35 24.506 48.493)scale(-1 1)"/></g><g filter="url(#h)"><ellipse cx="3.47" cy="21.501" fill="#7e14ff" rx="3.47" ry="21.501" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.009 28.708 47.59)scale(-1 1)"/></g><g filter="url(#i)"><ellipse cx="3.47" cy="21.501" fill="#7e14ff" rx="3.47" ry="21.501" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(89.009 28.708 47.59)scale(-1 1)"/></g><g filter="url(#j)"><ellipse cx=".387" cy="8.972" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(39.51 .387 8.972)"/></g><g filter="url(#k)"><ellipse cx="47.523" cy="-6.092" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 47.523 -6.092)"/></g><g filter="url(#l)"><ellipse cx="41.412" cy="6.333" fill="#47bfff" rx="5.971" ry="9.665" style="fill:#47bfff;fill:color(display-p3 .2799 .748 1);fill-opacity:1" transform="rotate(37.892 41.412 6.333)"/></g><g filter="url(#m)"><ellipse cx="-1.879" cy="38.332" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 -1.88 38.332)"/></g><g filter="url(#n)"><ellipse cx="-1.879" cy="38.332" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 -1.88 38.332)"/></g><g filter="url(#o)"><ellipse cx="35.651" cy="29.907" fill="#7e14ff" rx="4.407" ry="29.108" style="fill:#7e14ff;fill:color(display-p3 .4922 .0767 1);fill-opacity:1" transform="rotate(37.892 35.651 29.907)"/></g><g filter="url(#p)"><ellipse cx="38.418" cy="32.4" fill="#47bfff" rx="5.971" ry="15.297" style="fill:#47bfff;fill:color(display-p3 .2799 .748 1);fill-opacity:1" transform="rotate(37.892 38.418 32.4)"/></g></g><defs><filter id="b" width="60.045" height="41.654" x="-19.77" y="16.149" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="7.659"/></filter><filter id="c" width="90.34" height="51.437" x="-54.613" y="-7.533" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="7.659"/></filter><filter id="d" width="79.355" height="29.4" x="-49.64" y="2.03" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="e" width="79.579" height="29.4" x="-45.045" y="20.029" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="f" width="79.579" height="29.4" x="-43.513" y="21.178" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="g" width="74.749" height="58.852" x="15.756" y="-17.901" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="7.659"/></filter><filter id="h" width="61.377" height="25.362" x="23.548" y="2.284" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="i" width="61.377" height="25.362" x="23.548" y="2.284" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="j" width="56.045" height="63.649" x="-27.636" y="-22.853" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="k" width="54.814" height="64.646" x="20.116" y="-38.415" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="l" width="33.541" height="35.313" x="24.641" y="-11.323" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="m" width="54.814" height="64.646" x="-29.286" y="6.009" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="n" width="54.814" height="64.646" x="-29.286" y="6.009" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="o" width="54.814" height="64.646" x="8.244" y="-2.416" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter><filter id="p" width="39.409" height="43.623" x="18.713" y="10.588" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17158" stdDeviation="4.596"/></filter></defs></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<defs>
+
+  <!-- ── BACKGROUND GRADIENTS ─────────────────────────── -->
+  <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+    <stop offset="0%"   stop-color="#0b081c"/>
+    <stop offset="100%" stop-color="#160b38"/>
+  </linearGradient>
+
+  <radialGradient id="ambient" cx="256" cy="256" r="230" gradientUnits="userSpaceOnUse">
+    <stop offset="0%"   stop-color="#301870" stop-opacity="0.75"/>
+    <stop offset="60%"  stop-color="#1a0a48" stop-opacity="0.35"/>
+    <stop offset="100%" stop-color="#0b081c" stop-opacity="0"/>
+  </radialGradient>
+
+  <!-- warm ambient glow near bottom-left (origin of journey) -->
+  <radialGradient id="startGlow" cx="115" cy="400" r="160" gradientUnits="userSpaceOnUse">
+    <stop offset="0%"   stop-color="#f5c224" stop-opacity="0.14"/>
+    <stop offset="100%" stop-color="#0b081c" stop-opacity="0"/>
+  </radialGradient>
+
+  <!-- cool ambient glow near top-right (destination) -->
+  <radialGradient id="endGlow" cx="400" cy="112" r="160" gradientUnits="userSpaceOnUse">
+    <stop offset="0%"   stop-color="#ffaa40" stop-opacity="0.12"/>
+    <stop offset="100%" stop-color="#0b081c" stop-opacity="0"/>
+  </radialGradient>
+
+  <!-- ── FLOW PATH GRADIENT (gold → amber) ─────────── -->
+  <linearGradient id="flowGrad" x1="115" y1="400" x2="405" y2="115" gradientUnits="userSpaceOnUse">
+    <stop offset="0%"   stop-color="#f7c520"/>
+    <stop offset="48%"  stop-color="#ff8d38"/>
+    <stop offset="100%" stop-color="#ffb045"/>
+  </linearGradient>
+
+  <!-- subtle inner highlight on the stroke -->
+  <linearGradient id="flowHighlight" x1="115" y1="400" x2="405" y2="115" gradientUnits="userSpaceOnUse">
+    <stop offset="0%"   stop-color="#ffe580" stop-opacity="0.6"/>
+    <stop offset="100%" stop-color="#fff3c4" stop-opacity="0.3"/>
+  </linearGradient>
+
+  <!-- ── FILTERS ────────────────────────────────────── -->
+
+  <!-- very wide diffuse glow (outer aura) -->
+  <filter id="aura" x="-70%" y="-70%" width="240%" height="240%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="32"/>
+  </filter>
+
+  <!-- medium glow -->
+  <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="blur"/>
+    <feMerge>
+      <feMergeNode in="blur"/>
+      <feMergeNode in="SourceGraphic"/>
+    </feMerge>
+  </filter>
+
+  <!-- soft glow (for fine elements) -->
+  <filter id="softGlow" x="-25%" y="-25%" width="150%" height="150%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="blur"/>
+    <feMerge>
+      <feMergeNode in="blur"/>
+      <feMergeNode in="SourceGraphic"/>
+    </feMerge>
+  </filter>
+
+  <!-- clip to rounded rect -->
+  <clipPath id="iconClip">
+    <rect width="512" height="512" rx="115"/>
+  </clipPath>
+
+</defs>
+
+<!-- ── BACKGROUND ────────────────────────────────────── -->
+<rect width="512" height="512" rx="115" fill="url(#bg)"/>
+<rect width="512" height="512" rx="115" fill="url(#ambient)"/>
+<rect width="512" height="512" rx="115" fill="url(#startGlow)"/>
+<rect width="512" height="512" rx="115" fill="url(#endGlow)"/>
+
+<!-- ── MOUNTAIN SILHOUETTES (subliminal הפסגה) ────────── -->
+<g clip-path="url(#iconClip)" opacity="1">
+  <!-- back mountain (slightly left) -->
+  <polygon points="168,210 262,68 356,210" fill="#1d1052" opacity="0.55"/>
+  <!-- front mountain (slightly right, taller) -->
+  <polygon points="220,210 320,60 420,210" fill="#21135e" opacity="0.42"/>
+  <!-- ground plane hint -->
+  <rect x="0" y="205" width="512" height="10" fill="#1a0d50" opacity="0.2"/>
+</g>
+
+<!-- ── FLOWING PATH ───────────────────────────────────── -->
+
+<!-- Layer 1 — diffuse aura (widest, most transparent) -->
+<path d="M 115,400 C 95,302 152,252 214,250 C 300,248 392,196 405,115"
+  fill="none"
+  stroke="#ff9030"
+  stroke-width="100"
+  stroke-linecap="round"
+  opacity="0.13"
+  filter="url(#aura)"
+/>
+
+<!-- Layer 2 — soft mid-halo -->
+<path d="M 115,400 C 95,302 152,252 214,250 C 300,248 392,196 405,115"
+  fill="none"
+  stroke="url(#flowGrad)"
+  stroke-width="60"
+  stroke-linecap="round"
+  opacity="0.22"
+  filter="url(#glow)"
+/>
+
+<!-- Layer 3 — core path (main stroke) -->
+<path d="M 115,400 C 95,302 152,252 214,250 C 300,248 392,196 405,115"
+  fill="none"
+  stroke="url(#flowGrad)"
+  stroke-width="40"
+  stroke-linecap="round"
+  filter="url(#glow)"
+/>
+
+<!-- Layer 4 — inner highlight streak (luxury sheen) -->
+<path d="M 115,400 C 95,302 152,252 214,250 C 300,248 392,196 405,115"
+  fill="none"
+  stroke="url(#flowHighlight)"
+  stroke-width="14"
+  stroke-linecap="round"
+  opacity="0.55"
+/>
+
+<!-- ── JOURNEY NODES ──────────────────────────────────── -->
+
+<!-- START — origin of the journey (bottom-left) -->
+<!-- aura ring -->
+<circle cx="115" cy="400" r="52" fill="#f7c520" opacity="0.12" filter="url(#aura)"/>
+<!-- outer ring -->
+<circle cx="115" cy="400" r="34" fill="none" stroke="#f7c520" stroke-width="2.5" opacity="0.5"/>
+<!-- filled circle -->
+<circle cx="115" cy="400" r="26" fill="#f7c520" filter="url(#softGlow)"/>
+<!-- inner bright core -->
+<circle cx="115" cy="400" r="13" fill="#fffbe6"/>
+<!-- micro specular highlight -->
+<circle cx="109" cy="393" r="5" fill="#ffffff" opacity="0.7"/>
+
+<!-- END — the summit / הפסגה (top-right) -->
+<!-- aura ring -->
+<circle cx="405" cy="115" r="44" fill="#ffb045" opacity="0.12" filter="url(#aura)"/>
+<!-- outer ring -->
+<circle cx="405" cy="115" r="28" fill="none" stroke="#ffb045" stroke-width="2.5" opacity="0.5"/>
+<!-- filled circle -->
+<circle cx="405" cy="115" r="21" fill="#ffb045" filter="url(#softGlow)"/>
+<!-- inner bright core -->
+<circle cx="405" cy="115" r="9.5" fill="#fff6e0"/>
+<!-- micro specular highlight -->
+<circle cx="400" cy="109" r="4" fill="#ffffff" opacity="0.65"/>
+
+<!-- ── SPARKLE ACCENTS ────────────────────────────────── -->
+
+<!-- 4-point star near mountains peak (top-center) -->
+<g filter="url(#softGlow)" opacity="0.65">
+  <path d="M 255,104
+           L 258.5,94  L 262,104
+           L 272,107.5 L 262,111
+           L 258.5,121 L 255,111
+           L 245,107.5 Z"
+    fill="#f7c520"/>
+</g>
+
+<!-- small 4-point star (upper-right area) -->
+<g filter="url(#softGlow)" opacity="0.45">
+  <path d="M 358,162
+           L 360.5,155 L 363,162
+           L 370,164.5 L 363,167
+           L 360.5,174 L 358,167
+           L 351,164.5 Z"
+    fill="#ffb045"/>
+</g>
+
+<!-- tiny sparkle dot (lower mid) -->
+<circle cx="310" cy="306" r="4.5" fill="#ff8d38" opacity="0.38" filter="url(#softGlow)"/>
+
+<!-- another tiny dot (path midpoint accent) -->
+<circle cx="214" cy="250" r="7" fill="#ff8d38" opacity="0.25" filter="url(#softGlow)"/>
+
+<!-- ── BORDER SHEEN (luxury edge highlight) ─────────── -->
+<rect width="512" height="512" rx="115"
+  fill="none"
+  stroke="url(#flowHighlight)"
+  stroke-width="1.5"
+  opacity="0.18"
+/>
+
+</svg>
