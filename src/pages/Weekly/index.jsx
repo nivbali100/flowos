@@ -827,7 +827,7 @@ function DragGhost({ task }) {
 
 // ─── Column ───────────────────────────────────────────────────────────────────
 
-function Column({ col, tasks, quarterly, monthly, period, onAdd, onMove, onDelete, onEdit, onUpdate, onToggleBig3, big3Count, focusModeId, onFocus, goalOptions, onBulkMove, isDragActive }) {
+function Column({ col, tasks, quarterly, monthly, period, onAdd, onMove, onDelete, onEdit, onUpdate, onToggleBig3, big3Count, focusModeId, onFocus, goalOptions, onBulkMove, isDragActive, onMobileMove }) {
   const colTasks   = tasks.filter(t => t.status === col.id)
   const canAddBig3 = big3Count < 3
 
@@ -995,6 +995,7 @@ function Column({ col, tasks, quarterly, monthly, period, onAdd, onMove, onDelet
                     isDragActive={isDragActive}
                     dragListeners={dragListeners}
                     dragHandleRef={dragHandleRef}
+                    onMobileMove={onMobileMove}
                   />
                 </>
               )}
@@ -1507,6 +1508,7 @@ export default function Weekly() {
   const [search,         setSearch]        = useState('')      // T2-A
   const [activeFilter,   setActiveFilter]  = useState('all')   // T2-A
   const [showCelebration, setShowCelebration] = useState(false)
+  const [mobileMovingTask, setMobileMovingTask] = useState(null)  // mobile move sheet
 
   // ── Undo Toast ──────────────────────────────────────────────────────────
   const [undoQueue,  setUndoQueue]  = useState([])
@@ -1578,8 +1580,8 @@ export default function Weekly() {
       activationConstraint: { distance: 5 },
     }),
     useSensor(TouchSensor, {
-      // Short delay on mobile — grip icon is the handle so accidental drags aren't a concern
-      activationConstraint: { delay: 150, tolerance: 5 },
+      // 250ms hold on mobile — prevents carousel scroll from stealing the drag
+      activationConstraint: { delay: 250, tolerance: 8 },
     }),
   )
 
@@ -1732,7 +1734,7 @@ export default function Weekly() {
     setCapacityWarning(null)
   }
 
-  const colProps = { tasks: displayTasks, monthly, quarterly, period, onAdd: addTask, onMove: handleMoveWithUndo, onDelete: handleDeleteTask, onEdit: setEditing, onUpdate: updateTask, onToggleBig3: handleToggleBig3, big3Count, focusModeId, onFocus: handleFocus, goalOptions, onBulkMove: bulkMoveTask, isDragActive: !!activeDragId }
+  const colProps = { tasks: displayTasks, monthly, quarterly, period, onAdd: addTask, onMove: handleMoveWithUndo, onDelete: handleDeleteTask, onEdit: setEditing, onUpdate: updateTask, onToggleBig3: handleToggleBig3, big3Count, focusModeId, onFocus: handleFocus, goalOptions, onBulkMove: bulkMoveTask, isDragActive: !!activeDragId, onMobileMove: (id) => setMobileMovingTask(tasks.find(t => t.id === id) || null) }
 
   // ── Body scroll lock when any modal is open ─────────────────────────────
   const anyModalOpen = !!(editingTask || showClose || showMorning || capacityWarning)
@@ -1876,9 +1878,9 @@ export default function Weekly() {
                 </button>
               ))}
             </div>
-            {/* Horizontal scroll container */}
+            {/* Horizontal scroll container — locked during drag so touch isn't stolen */}
             <div
-              className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-4 scroll-smooth"
+              className={`flex gap-3 snap-x snap-mandatory pb-4 scroll-smooth ${activeDragId ? 'overflow-x-hidden touch-none' : 'overflow-x-auto'}`}
               style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
               onScroll={e => {
                 // Update active tab based on which column is most visible
@@ -1988,6 +1990,46 @@ export default function Weekly() {
           </div>
           <div className="absolute top-1/3 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-2xl shadow-2xl font-black text-lg animate-slide-up">
             +10 XP 🔥
+          </div>
+        </div>
+      )}
+
+      {/* ── Mobile Move Bottom Sheet ── */}
+      {mobileMovingTask && (
+        <div className="fixed inset-0 z-[500] md:hidden" onClick={() => setMobileMovingTask(null)}>
+          <div className="absolute inset-0 bg-black/50" />
+          <div
+            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl px-4 pt-3 pb-10 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Handle */}
+            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
+            {/* Task title */}
+            <p className="text-sm font-black text-slate-800 text-center mb-0.5 truncate px-4">{mobileMovingTask.title}</p>
+            <p className="text-xs text-slate-400 text-center mb-4">העבר לעמודה:</p>
+            {/* Column grid */}
+            <div className="grid grid-cols-5 gap-2">
+              {COLUMNS.map(col => (
+                <button
+                  key={col.id}
+                  onClick={() => {
+                    if (col.id !== mobileMovingTask.status) handleMoveWithUndo(mobileMovingTask.id, col.id)
+                    setMobileMovingTask(null)
+                  }}
+                  className={`flex flex-col items-center py-3 px-1 rounded-xl border-2 transition-colors active:scale-95 ${
+                    mobileMovingTask.status === col.id
+                      ? 'border-brand-400 bg-brand-50'
+                      : 'border-slate-200 bg-slate-50 active:border-brand-300 active:bg-brand-50'
+                  }`}
+                >
+                  <span className="text-2xl leading-none mb-1">{col.emoji}</span>
+                  <span className="text-[9px] font-bold text-slate-700 text-center leading-tight">{col.label}</span>
+                  {mobileMovingTask.status === col.id && (
+                    <span className="text-[8px] text-brand-500 font-bold mt-0.5">כאן</span>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Check, Trash2, Pencil, X,
   Star, RotateCcw,
-  AlertTriangle, Clock, Zap, Target, GripVertical, CalendarClock,
+  AlertTriangle, Clock, Zap, Target, GripVertical, CalendarClock, ArrowLeftRight,
 } from 'lucide-react'
 import { normPriority } from '../../utils/tasks.js'
 import { detectStuck, classifyStuck } from '../../engine/stuckDetector.js'
@@ -44,7 +44,7 @@ function dueDateStatus(dueDate) {
 }
 
 // ─── Task Card ────────────────────────────────────────────────────────────────
-export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onToggleBig3, canAddBig3, isFocused, isDimmed, onFocus, goalOptions, isDragActive, dragListeners, dragHandleRef }) {
+export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onToggleBig3, canAddBig3, isFocused, isDimmed, onFocus, goalOptions, isDragActive, dragListeners, dragHandleRef, onMobileMove }) {
   const [confirmDelete,  setConfirmDelete]  = useState(false)
   const [editingTitle,   setEditingTitle]   = useState(false)   // T1-B
 
@@ -196,10 +196,10 @@ export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onT
             <div
               ref={dragHandleRef}
               {...dragListeners}
-              className="shrink-0 mt-1.5 cursor-grab active:cursor-grabbing touch-none p-0.5 -ml-0.5 text-slate-300 hover:text-slate-400 transition-colors"
+              className="shrink-0 cursor-grab active:cursor-grabbing touch-none -ml-0.5 text-slate-300 hover:text-slate-400 transition-colors min-h-[40px] min-w-[32px] flex items-center justify-center"
               title="גרור"
             >
-              <GripVertical className="w-3.5 h-3.5" />
+              <GripVertical className="w-4 h-4" />
             </div>
           )}
           {/* Quick-complete circle */}
@@ -450,6 +450,17 @@ export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onT
             <button onClick={e => { e.stopPropagation(); onMove(task.id, 'today') }}
               className="min-h-[44px] py-2 px-3 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors">
               ⏸ פאוז
+            </button>
+          )}
+
+          {/* Mobile: quick column picker button */}
+          {!isDone && onMobileMove && (
+            <button
+              onClick={e => { e.stopPropagation(); onMobileMove(task.id) }}
+              className="md:hidden p-2.5 text-slate-400 hover:text-brand-500 rounded-xl hover:bg-brand-50 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+              title="העבר לעמודה"
+            >
+              <ArrowLeftRight className="w-4 h-4" />
             </button>
           )}
 
