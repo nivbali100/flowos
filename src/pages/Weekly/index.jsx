@@ -756,11 +756,12 @@ function SortableTaskWrapper({ id, children }) {
   } = useSortable({ id })
 
   const style = {
-    transform:  CSS.Transform.toString(transform ? { ...transform, scaleX: 1, scaleY: 1 } : null),
-    transition: isDragging ? undefined : (transition || undefined),
-    opacity:    isDragging ? 0 : 1,
-    zIndex:     isDragging ? 999 : 'auto',
-    position:   'relative',
+    transform:   CSS.Transform.toString(transform ? { ...transform, scaleX: 1, scaleY: 1 } : null),
+    transition:  isDragging ? undefined : (transition || undefined),
+    opacity:     isDragging ? 0 : 1,
+    zIndex:      isDragging ? 999 : 'auto',
+    position:    'relative',
+    touchAction: 'none',
   }
 
   return (
@@ -769,7 +770,7 @@ function SortableTaskWrapper({ id, children }) {
       style={style}
       {...attributes}
       {...listeners}
-      className="select-none cursor-grab active:cursor-grabbing touch-none"
+      className="select-none cursor-grab active:cursor-grabbing"
     >
       {typeof children === 'function'
         ? children({ isDragging })
@@ -1572,8 +1573,7 @@ export default function Weekly() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      // Small movement threshold — drag only starts from the GripVertical handle
-      activationConstraint: { distance: 5 },
+      activationConstraint: { distance: 8 },
     }),
     useSensor(TouchSensor, {
       // 250ms hold on mobile — prevents carousel scroll from stealing the drag

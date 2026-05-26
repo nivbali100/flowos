@@ -280,8 +280,8 @@ export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onT
           )}
         </div>
 
-        {/* Details block — hidden by default on desktop, revealed on hover or focus/stuck/doing */}
-        <div className={`hidden md:block space-y-1.5 ${!isFocused && !isStuck && !isDoing ? 'md:hidden md:group-hover:block' : ''}`}>
+        {/* Details block — only visible when focused, stuck, or doing */}
+        <div className={`space-y-1.5 ${isFocused || isStuck || isDoing ? '' : 'hidden'}`}>
 
         {/* Goal connection strip */}
         {!isDone && (
@@ -392,8 +392,8 @@ export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onT
           )}
         </div>
 
-        {/* Desktop: full action buttons layout — hidden by default, shown on hover or when focused/doing/done */}
-        <div className={`items-center gap-2 pt-1 flex-wrap hidden ${isFocused || isDoing || isDone ? 'md:flex' : 'md:group-hover:flex'}`}>
+        {/* Desktop: action buttons — only when focused, doing, or done */}
+        <div className={`items-center gap-2 pt-1 flex-wrap ${isFocused || isDoing || isDone ? 'hidden md:flex' : 'hidden'}`}>
           {/* PRIMARY button */}
           {isBacklog && (
             <button onClick={e => { e.stopPropagation(); onMove(task.id, 'today') }}
