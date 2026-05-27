@@ -5,11 +5,19 @@
  */
 import { useState, useCallback, createContext, useContext, createElement, useEffect } from 'react'
 import { syncGoalsToSupabase, upsertCoach, syncTaskToSupabase, deleteTaskFromSupabase, fetchTasksForCoach } from '../lib/supabase.js'
+import { getAuthEmailSync } from '../lib/auth.js'
 import { XP_VALUES } from '../constants/app.js'
 import { emitTaskEvent, emitEvent, EVENT_TYPES } from '../utils/events.js'
 
-// Helper — reads coach email from localStorage without touching React state
+/**
+ * Resolve the coach email for Supabase operations.
+ * Priority: 1) Supabase auth session (most reliable)
+ *           2) FlowOS profile in localStorage (local-only / no-auth mode)
+ * This prevents desync when a user's auth email differs from their old profile email.
+ */
 function getCoachEmail() {
+  const authEmail = getAuthEmailSync()
+  if (authEmail) return authEmail
   try { return JSON.parse(localStorage.getItem('flowos_profile') || '{}')?.email || null }
   catch { return null }
 }
@@ -250,9 +258,11 @@ function useStoreInternal() {
   const [streak,        setStreakState]     = useState(() => getStreak())
   const [setupComplete, setSetupComplete]  = useState(() => !!localStorage.getItem('flowos_setup_complete'))
 
-  // Read-back from Supabase on startup if localStorage is empty
+  // Read-back from Supabase on startup if localStorage is empty.
+  // Uses auth session email as fallback so cross-device users recover their data
+  // even when flowos_profile hasn't been written to this device yet.
   useEffect(() => {
-    const email = profile?.email
+    const email = profile?.email || getAuthEmailSync()
     if (!email || tasks.length > 0) return
     fetchTasksForCoach(email).then(remoteTasks => {
       if (!remoteTasks?.length) return

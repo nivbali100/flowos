@@ -2,6 +2,7 @@ import { Suspense, lazy, useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from './components/layout/AppShell.jsx'
 import { AuthProvider, useAuth } from './hooks/useAuth.js'
+import { fetchTasksForCoach } from './lib/supabase.js'
 
 // ─── Lazy-loaded pages — each becomes a separate JS chunk ─────────────────────
 const GameRules    = lazy(() => import('./pages/GameRules/index.jsx'))
@@ -50,10 +51,40 @@ function RequireAuth({ children }) {
 }
 
 // ─── Setup guard — redirects to /setup if first-run wizard not complete ───────
+// Cross-device recovery: if setup flag is missing but user is authenticated,
+// we check Supabase for existing task data before redirecting to /setup.
+// This handles the case where a user opens FlowOS on a new device.
 function RequireSetup({ children }) {
   const setupDone = !!localStorage.getItem('flowos_setup_complete')
-  if (!setupDone) return <Navigate to="/setup" replace />
-  return children
+  const { userEmail, isAuthenticated } = useAuth()
+  const hasSupabase = !!import.meta.env.VITE_SUPABASE_ANON
+
+  // Determine initial state synchronously so we never flash a wrong screen
+  const [recoveryState, setRecoveryState] = useState(() => {
+    if (setupDone) return 'ok'
+    // If no Supabase key or not authenticated — can't recover, go to setup
+    if (!hasSupabase || !isAuthenticated || !userEmail) return 'redirect-setup'
+    // Has auth + Supabase → check if user has existing data
+    return 'checking'
+  })
+
+  useEffect(() => {
+    if (recoveryState !== 'checking') return
+    fetchTasksForCoach(userEmail).then(tasks => {
+      if (tasks?.length > 0) {
+        // User has cloud data — auto-restore: set setup flag and continue
+        localStorage.setItem('flowos_setup_complete', '1')
+        setRecoveryState('ok')
+      } else {
+        // Truly new user — go to setup wizard
+        setRecoveryState('redirect-setup')
+      }
+    }).catch(() => setRecoveryState('redirect-setup'))
+  }, [recoveryState, userEmail])
+
+  if (recoveryState === 'ok') return children
+  if (recoveryState === 'checking') return <PageLoader />
+  return <Navigate to="/setup" replace />
 }
 
 // ─── Storage-full warning banner ─────────────────────────────────────────────
