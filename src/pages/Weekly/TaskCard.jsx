@@ -151,7 +151,6 @@ export default function TaskCard({ task, onMove, onDelete, onEdit, onUpdate, onT
     <div
       onClick={e => {
         if (!isDone && !e.target.closest('button') && !e.target.closest('input') && onFocus) {
-          e.stopPropagation()
           onFocus(task.id)
         }
       }}

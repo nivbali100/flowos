@@ -1574,10 +1574,10 @@ export default function Weekly() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { delay: 150, tolerance: 5 },
+      activationConstraint: { distance: 3 },
     }),
     useSensor(TouchSensor, {
-      activationConstraint: { delay: 200, tolerance: 8 },
+      activationConstraint: { delay: 250, tolerance: 5 },
     }),
   )
 
