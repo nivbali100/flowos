@@ -758,7 +758,7 @@ function SortableTaskWrapper({ id, children }) {
   const style = {
     transform:   CSS.Transform.toString(transform ? { ...transform, scaleX: 1, scaleY: 1 } : null),
     transition:  isDragging ? undefined : (transition || undefined),
-    opacity:     isDragging ? 0.4 : 1,
+    opacity:     isDragging ? 0 : 1,
     zIndex:      isDragging ? 999 : 'auto',
     position:    'relative',
     touchAction: 'none',
@@ -1840,6 +1840,7 @@ export default function Weekly() {
 
         {/* ── Kanban Board — wrapped in DndContext ─────────────────────── */}
         <DndContext
+          measuring={{ draggable: { measure: (el) => el.getBoundingClientRect() } }}
           sensors={sensors}
           collisionDetection={kanbanCollision}
           onDragStart={handleDragStart}
@@ -1885,8 +1886,10 @@ export default function Weekly() {
             ))}
           </div>
 
-          {/* Ghost card shown while dragging */}
-          <DragOverlay dropAnimation={null} />
+          {/* Ghost card follows cursor during drag */}
+          <DragOverlay dropAnimation={{ duration: 150, easing: 'ease' }}>
+            {activeDragTask ? <DragGhost task={activeDragTask} /> : null}
+          </DragOverlay>
         </DndContext>
 
         <div className="h-8" />
