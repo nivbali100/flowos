@@ -1574,11 +1574,10 @@ export default function Weekly() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
+      activationConstraint: { delay: 150, tolerance: 5 },
     }),
     useSensor(TouchSensor, {
-      // 250ms hold on mobile — prevents carousel scroll from stealing the drag
-      activationConstraint: { delay: 250, tolerance: 8 },
+      activationConstraint: { delay: 200, tolerance: 8 },
     }),
   )
 
