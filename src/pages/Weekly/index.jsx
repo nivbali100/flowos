@@ -222,11 +222,13 @@ function pickNextBest(tasks) {
 
 // ─── Weekly Progress Strip ────────────────────────────────────────────────────
 function WeeklyProgress({ tasks, onCloseWeek }) {
-  const active    = tasks.filter(t => t.status !== 'done')
-  const done      = tasks.filter(t => t.status === 'done')
-  const total     = tasks.length
+  // Only count non-archived tasks for current-week stats
+  const weekTasks = tasks.filter(t => !t.archivedAt)
+  const active    = weekTasks.filter(t => t.status !== 'done')
+  const done      = weekTasks.filter(t => t.status === 'done')
+  const total     = weekTasks.length
   const pct       = total > 0 ? Math.round((done.length / total) * 100) : 0
-  const big3      = tasks.filter(t => t.isBigThree)
+  const big3      = weekTasks.filter(t => t.isBigThree)
   const big3Done  = big3.filter(t => t.status === 'done').length
   const critical  = active.filter(t => normPriority(t.priority) === 'critical').length
   const onTrack   = big3Done >= 2 || (big3.length === 0 && pct >= 50)
@@ -828,7 +830,7 @@ function DragGhost({ task }) {
 // ─── Column ───────────────────────────────────────────────────────────────────
 
 function Column({ col, tasks, quarterly, monthly, period, onAdd, onMove, onDelete, onEdit, onUpdate, onToggleBig3, big3Count, focusModeId, onFocus, goalOptions, onBulkMove, isDragActive, onMobileMove }) {
-  const colTasks   = tasks.filter(t => t.status === col.id)
+  const colTasks   = tasks.filter(t => t.status === col.id && !t.archivedAt)
   const canAddBig3 = big3Count < 3
 
   // Droppable zone — id matches column status string
@@ -1495,7 +1497,7 @@ function checkHasGoals(monthly, quarterly) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function Weekly() {
-  const { tasks, addTask, updateTask, deleteTask, moveTask, setBigThree, bulkMoveTask, reorderTasks, restoreTask, monthly, quarterly, profile, awardXP } = useStore()
+  const { tasks, addTask, updateTask, deleteTask, moveTask, setBigThree, bulkMoveTask, reorderTasks, restoreTask, monthly, quarterly, profile, awardXP, closeWeek } = useStore()
   const period = usePeriod()
   const [activeTab,      setActiveTab]     = useState('backlog')
   const [editingTask,    setEditing]       = useState(null)
@@ -1939,6 +1941,7 @@ export default function Weekly() {
           onClose={() => setShowClose(false)}
           onMoveTask={handleMoveWithUndo}
           onDeleteTask={handleDeleteTask}
+          onCloseWeek={closeWeek}
           profile={profile}
         />
       )}

@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppShell from './components/layout/AppShell.jsx'
 
@@ -36,8 +36,27 @@ function RequireSetup({ children }) {
   return children
 }
 
+// ─── Storage-full warning banner ─────────────────────────────────────────────
+function StorageWarningBanner() {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    function handleFull() { setVisible(true) }
+    window.addEventListener('flowos:storage-full', handleFull)
+    return () => window.removeEventListener('flowos:storage-full', handleFull)
+  }, [])
+  if (!visible) return null
+  return (
+    <div className="fixed top-0 inset-x-0 z-[9999] bg-red-600 text-white text-sm font-bold px-4 py-3 flex items-center justify-between shadow-lg">
+      <span>⚠️ הזיכרון המקומי מלא — שמירת נתונים עלולה להיכשל. סגור שבוע ישן או מחק משימות.</span>
+      <button onClick={() => setVisible(false)} className="mr-4 text-white/80 hover:text-white text-lg leading-none">✕</button>
+    </div>
+  )
+}
+
 export default function App() {
   return (
+    <>
+    <StorageWarningBanner />
     <BrowserRouter>
       <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -73,5 +92,6 @@ export default function App() {
         </Routes>
       </Suspense>
     </BrowserRouter>
+    </>
   )
 }

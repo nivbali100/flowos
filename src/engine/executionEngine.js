@@ -70,9 +70,10 @@ function urgencyScore(task) {
   // New urgencyScore field (1-5)
   if (task.urgencyScore) return (task.urgencyScore - 1) / 4
 
-  // Legacy: deadline proximity
-  if (task.deadline) {
-    const msLeft = new Date(task.deadline).getTime() - Date.now()
+  // Due-date proximity — field is 'dueDate' in the task model
+  const dueField = task.dueDate || task.deadline  // support legacy 'deadline' too
+  if (dueField) {
+    const msLeft = new Date(dueField).getTime() - Date.now()
     if (msLeft <= 0) return 1.0           // overdue
     if (msLeft <= 24 * HOUR) return 0.95  // due today
     if (msLeft <= 3 * 24 * HOUR) return 0.7
@@ -141,10 +142,11 @@ export function getNextBestTask(tasks) {
   )
   if (active.length === 0) return null
 
-  // 2. Deadline today (hard override)
+  // 2. Due today (hard override) — field is 'dueDate', legacy 'deadline' also supported
   const deadlineToday = active.find(t => {
-    if (!t.deadline) return false
-    const ms = new Date(t.deadline).getTime() - Date.now()
+    const dueField = t.dueDate || t.deadline
+    if (!dueField) return false
+    const ms = new Date(dueField).getTime() - Date.now()
     return ms <= 24 * HOUR && ms > 0
   })
   if (deadlineToday) {

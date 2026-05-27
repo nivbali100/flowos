@@ -15,7 +15,7 @@ const PRIORITY_META = {
 }
 
 // ─── Close Week Modal ─────────────────────────────────────────────────────────
-export default function CloseWeekModal({ tasks, period, onClose, onMoveTask, onDeleteTask, profile }) {
+export default function CloseWeekModal({ tasks, period, onClose, onMoveTask, onDeleteTask, profile, onCloseWeek }) {
   const [mainWin,    setMainWin]    = useState('')
   const [whatWorked, setWhatWorked] = useState('')   // retro: מה עבד
   const [whatChange, setWhatChange] = useState('')   // retro: מה לשנות
@@ -75,22 +75,30 @@ export default function CloseWeekModal({ tasks, period, onClose, onMoveTask, onD
     syncWeekSummary(summary, profile)
     setSaved(true)
     setSaving(false)
-    // T3-D: if there are open tasks, show step 2
+    // T3-D: if there are open tasks, show step 2; otherwise archive immediately
     const openTasks = tasks.filter(t => t.status !== 'done')
     if (openTasks.length > 0) {
       setTimeout(() => setStep(2), 800)
     } else {
+      // No open tasks — archive done tasks right away
+      if (onCloseWeek) onCloseWeek({})
       setTimeout(onClose, 1400)
     }
   }
 
-  // T3-D: apply decisions and close
+  // T3-D: apply decisions and close — now delegates to closeWeek() for archive + XP
   function applyDecisions() {
-    Object.entries(decisions).forEach(([id, action]) => {
-      if (action === 'next-week') onMoveTask(id, 'week')
-      else if (action === 'backlog') onMoveTask(id, 'backlog')
-      else if (action === 'delete') onDeleteTask(id)
-    })
+    if (onCloseWeek) {
+      // New path: single atomic operation that archives done tasks + applies decisions
+      onCloseWeek(decisions)
+    } else {
+      // Fallback: legacy individual move/delete calls
+      Object.entries(decisions).forEach(([id, action]) => {
+        if (action === 'next-week') onMoveTask(id, 'week')
+        else if (action === 'backlog') onMoveTask(id, 'backlog')
+        else if (action === 'delete') onDeleteTask(id)
+      })
+    }
     onClose()
   }
 

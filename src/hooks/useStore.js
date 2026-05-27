@@ -6,6 +6,7 @@
 import { useState, useCallback, createContext, useContext, createElement, useEffect } from 'react'
 import { syncGoalsToSupabase, upsertCoach, syncTaskToSupabase, deleteTaskFromSupabase, fetchTasksForCoach } from '../lib/supabase.js'
 import { XP_VALUES } from '../constants/app.js'
+import { emitTaskEvent, emitEvent, EVENT_TYPES } from '../utils/events.js'
 
 // Helper — reads coach email from localStorage without touching React state
 function getCoachEmail() {
@@ -418,8 +419,10 @@ function useStoreInternal() {
       persist('flowos_tasks', next)
       return next
     })
-    // fire-and-forget sync
-    syncTaskToSupabase(task, getCoachEmail())
+    // fire-and-forget sync + event
+    const email = getCoachEmail()
+    syncTaskToSupabase(task, email)
+    emitTaskEvent(EVENT_TYPES.TASK_CREATED, task, {}, email)
     return task
   }, [])
 
@@ -460,6 +463,8 @@ function useStoreInternal() {
     })
     // Fire-and-forget outside the state setter — safe from React batching issues
     deleteTaskFromSupabase(id, email)
+    // Capture deleted task title for the event (before it's gone from state)
+    emitEvent(EVENT_TYPES.TASK_DELETED, { task_id: id }, email)
   }, [])
 
   const moveTask = useCallback((id, newStatus) => {
@@ -500,21 +505,51 @@ function useStoreInternal() {
     })
 
     // Side effects outside the state updater — safe from React batching/StrictMode double-calls
-    if (movedTaskResult) syncTaskToSupabase(movedTaskResult, getCoachEmail())
+    const coachEmail = getCoachEmail()
+    if (movedTaskResult) {
+      syncTaskToSupabase(movedTaskResult, coachEmail)
+
+      // Behavioral events
+      const prevStatus = movedTaskResult.__prevStatus  // not available here — use newStatus logic
+      if (newStatus === 'done') {
+        emitTaskEvent(EVENT_TYPES.TASK_COMPLETED, movedTaskResult, {}, coachEmail)
+        if (movedTaskResult.isBigThree) {
+          emitTaskEvent(EVENT_TYPES.BIG3_COMPLETED, movedTaskResult, {}, coachEmail)
+        }
+      } else if (newStatus === 'doing') {
+        emitTaskEvent(EVENT_TYPES.FOCUS_SESSION_STARTED, movedTaskResult, {}, coachEmail)
+      } else {
+        // Deferral: touch_count incremented in moveTask
+        if ((movedTaskResult.touchCount || 0) > 0) {
+          emitTaskEvent(EVENT_TYPES.TASK_DEFERRED, movedTaskResult, { to_status: newStatus }, coachEmail)
+        } else {
+          emitTaskEvent(EVENT_TYPES.TASK_MOVED, movedTaskResult, { to_status: newStatus }, coachEmail)
+        }
+      }
+    }
 
     // XP + streak on task completion
-    if (newStatus === 'done' && nextTasksSnapshot) {
-      const earned = XP_VALUES.task_done
+    if (newStatus === 'done' && nextTasksSnapshot && movedTaskResult) {
+      let earned = XP_VALUES.task_done
+
+      // Big3 bonus: task is marked as Big 3
+      if (movedTaskResult.isBigThree) {
+        earned += XP_VALUES.big3_done
+      }
+
       addXP(earned)
       updateStreak()
       setXpState(getXP())
       setStreakState(getStreak())
 
       // Perfect day bonus: all active tasks (today + doing) are done — none left in progress
+      // Only award once per day (guard: check if perfect_day already awarded today)
       const remaining = nextTasksSnapshot.filter(t => t.status === 'today' || t.status === 'doing').length
       const hasDoneToday = nextTasksSnapshot.some(t => t.status === 'done' &&
         t.completedAt && new Date(t.completedAt).toDateString() === new Date().toDateString())
-      if (remaining === 0 && hasDoneToday) {
+      const perfectDayKey = `flowos_perfect_day_${new Date().toDateString()}`
+      if (remaining === 0 && hasDoneToday && !localStorage.getItem(perfectDayKey)) {
+        localStorage.setItem(perfectDayKey, '1')
         addXP(XP_VALUES.perfect_day)
         setXpState(getXP())
       }
@@ -670,6 +705,61 @@ function useStoreInternal() {
     setStreakState(getStreak())
   }, [])
 
+  // ── Close Week: archive done tasks, apply open-task decisions, award XP ──────
+  // decisions = { [taskId]: 'next-week' | 'backlog' | 'delete' }
+  // summary   = the week summary object (already saved by CloseWeekModal)
+  const closeWeek = useCallback((decisions = {}) => {
+    const email     = getCoachEmail()
+    const now       = new Date().toISOString()
+    const weekId    = `week-${now.slice(0, 10)}`  // e.g. "week-2026-05-28"
+
+    let tasksToDelete = []
+
+    setTasksState(prev => {
+      const next = prev
+        .filter(t => {
+          // Hard-delete tasks the user decided to remove
+          if (decisions[t.id] === 'delete') {
+            tasksToDelete.push(t.id)
+            return false
+          }
+          return true
+        })
+        .map(t => {
+          // Archive completed tasks — they leave the active board
+          if (t.status === 'done' && !t.archivedAt) {
+            return { ...t, archivedAt: now, weekId, updatedAt: now }
+          }
+          // Apply open-task decisions
+          if (decisions[t.id] === 'next-week') {
+            return { ...t, status: 'week', isBigThree: false, updatedAt: now }
+          }
+          if (decisions[t.id] === 'backlog') {
+            return { ...t, status: 'backlog', isBigThree: false, updatedAt: now }
+          }
+          // Undecided open tasks: move to backlog + clear Big3
+          if (t.status !== 'done') {
+            return { ...t, isBigThree: false, updatedAt: now }
+          }
+          return t
+        })
+      persist('flowos_tasks', next)
+      return next
+    })
+
+    // Delete from Supabase outside state updater
+    if (email) tasksToDelete.forEach(id => deleteTaskFromSupabase(id, email))
+
+    // Award week-closed XP
+    addXP(XP_VALUES.week_closed)
+    updateStreak()
+    setXpState(getXP())
+    setStreakState(getStreak())
+
+    // Behavioral event
+    emitEvent(EVENT_TYPES.WEEK_CLOSED, { week_id: weekId, decisions_count: Object.keys(decisions).length }, getCoachEmail())
+  }, [])
+
   // ── Reset (for testing / re-onboarding) ───────────────────────────────────
   const resetAll = useCallback(() => {
     Object.keys(localStorage).filter(k => k.startsWith('flowos_')).forEach(k => localStorage.removeItem(k))
@@ -715,6 +805,7 @@ function useStoreInternal() {
     xp,
     streak,
     awardXP,
+    closeWeek,
 
     setupComplete,
     completeSetup,
