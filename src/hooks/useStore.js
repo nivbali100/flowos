@@ -235,7 +235,17 @@ function useStoreInternal() {
   const [profile,       setProfileState]   = useState(() => load('flowos_profile',   DEFAULT_PROFILE))
   const [quarterly,     setQuarterlyState] = useState(() => load('flowos_quarterly', DEFAULT_QUARTERLY))
   const [monthly,       setMonthlyState]   = useState(() => load('flowos_monthly',   DEFAULT_MONTHLY))
-  const [tasks,         setTasksState]     = useState(() => load('flowos_tasks',     []))
+  const [tasks,         setTasksState]     = useState(() => {
+    const raw = load('flowos_tasks', [])
+    // One-time cleanup: remove ghost 'cancelled' tasks (legacy bug — they render in no column)
+    const hasCancelled = raw.some(t => t.status === 'cancelled')
+    if (hasCancelled) {
+      const cleaned = raw.filter(t => t.status !== 'cancelled')
+      try { localStorage.setItem('flowos_tasks', JSON.stringify(cleaned)) } catch {}
+      return cleaned
+    }
+    return raw
+  })
   const [xp,            setXpState]        = useState(() => getXP())
   const [streak,        setStreakState]     = useState(() => getStreak())
   const [setupComplete, setSetupComplete]  = useState(() => !!localStorage.getItem('flowos_setup_complete'))
@@ -571,9 +581,8 @@ function useStoreInternal() {
   const reorderTasks = useCallback((newTasksArray) => {
     setTasksState(newTasksArray)
     persist('flowos_tasks', newTasksArray)
-    // Fire-and-forget sync — reorder is a cosmetic change so we sync all affected tasks
-    const email = getCoachEmail()
-    if (email) newTasksArray.forEach(t => syncTaskToSupabase(t, email))
+    // Reorder is cosmetic — Supabase has no order column so no sync needed here.
+    // (Individual task mutations already sync on status/field change.)
   }, [])
 
   // ── Bulk status move ──────────────────────────────────────────────────────

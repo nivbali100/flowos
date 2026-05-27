@@ -8,8 +8,19 @@
 /** Total minutes of focused work capacity per day */
 export const DAILY_CAPACITY_MINUTES = 240
 
-/** Hours a task can sit in "doing" before being flagged as stuck */
+/**
+ * Hours a task can sit in "doing" before being flagged as stuck (pressure/coaching UI).
+ * Used by: flowBrain.js, pressureEngine, CloseWeekModal, WeeklyStateBanner.
+ * Intentionally short (3h) — pressure nudge, not the hard "stuck" detector.
+ */
 export const STUCK_HOURS = 3
+
+/**
+ * Hours a task must be in "doing" before stuckDetector/card shows the stuck warning.
+ * Used by: stuckDetector.js, executionEngine (getNextBestTaskWithContext).
+ * Intentionally longer (24h) — serious block, not just slow progress.
+ */
+export const STUCK_HARD_HOURS = 24
 
 /** Hours since movedToTodayAt before a task is flagged as carryover */
 export const CARRYOVER_THRESHOLD_HOURS = 20

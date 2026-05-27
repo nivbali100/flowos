@@ -11,8 +11,9 @@
  *   low-priority — task is in "today" but has low priority + low energy match
  */
 
+import { STUCK_HARD_HOURS } from '../constants/app.js'
 const HOUR = 60 * 60 * 1000
-const STUCK_THRESHOLD_HOURS = 24   // in "today"/"doing" for > 24h without progress
+const STUCK_THRESHOLD_HOURS = STUCK_HARD_HOURS   // single source: constants/app.js
 
 // ─── Detection ──────────────────────────────────────────────────────────────
 

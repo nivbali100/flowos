@@ -39,7 +39,8 @@ function isStaleTodayMultipleDays(task) {
 }
 
 function isHighAvoidance(task) {
-  if (['done', 'cancelled'].includes(task.status)) return false
+  // Exclude completed and archived tasks — only flag genuinely active avoidance
+  if (task.status === 'done' || task.archivedAt) return false
   const touches = task.touchCount || task.postponedCount || 0
   return touches >= 4
 }
@@ -71,7 +72,8 @@ export function detectNoise(tasks) {
   const items = []
 
   for (const task of tasks) {
-    if (['done', 'cancelled'].includes(task.status)) continue
+    // Skip completed and archived tasks — they don't belong in the noise scan
+    if (task.status === 'done' || task.archivedAt) continue
 
     if (isHighAvoidance(task)) {
       items.push({
@@ -137,8 +139,8 @@ export function detectNoise(tasks) {
         type: 'stale-backlog',
         label: 'ישנה בbacklog',
         description: `${days} ימים בלי מגע`,
-        action: 'ארכיון',
-        actionStatus: 'cancelled',
+        action: 'מחק',
+        actionStatus: '__delete__',   // sentinel: AntiNoisePanel calls onDelete, not onMove
         severity: 'low',
       })
     }

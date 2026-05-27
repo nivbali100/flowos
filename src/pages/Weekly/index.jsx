@@ -41,7 +41,7 @@ import { formatCurrency } from '../../utils/formatters.js'
 import PressureBanner from '../../components/ui/PressureBanner.jsx'
 import { getUnlinkedActive } from '../../utils/pressure.js'
 import { getFlowBrainState } from '../../utils/flowBrain.js'
-import { getNextBestTask, computeExecutionScore } from '../../engine/executionEngine.js'
+import { getNextBestTaskWithContext, computeExecutionScore } from '../../engine/executionEngine.js'
 import { detectNoise, noiseScore } from '../../engine/noiseDetector.js'
 import {
   DAILY_CAPACITY_MINUTES,
@@ -142,83 +142,7 @@ function loadSummaryContext() {
   } catch { return null }
 }
 
-// Pick the single best next task — considers state, stuck, unlinked, and summary
-function pickNextBest(tasks) {
-  const active   = tasks.filter(t => t.status !== 'done')
-  const summary  = loadSummaryContext()
-  const unlinked = getUnlinkedActive(tasks)
-
-  // P1 — open Big 3 not yet in doing
-  const big3Open = active.find(t => t.isBigThree && t.status !== 'doing')
-  if (big3Open) {
-    const extraCtx = summary?.noGoalCount >= 3
-      ? ` (יש ${summary.noGoalCount} ללא יעד — הגדולים קודם)`
-      : ''
-    return {
-      task:     big3Open,
-      reason:   `זה ה-Big 3 הפתוח שלך — תתחיל עם זה${extraCtx}`,
-      tag:      '★ Big 3', tagColor: 'bg-brand-100 text-brand-700',
-    }
-  }
-
-  // P2 — task stuck in doing >STUCK_HOURS
-  const stuckTask = active.find(t => {
-    if (t.status !== 'doing' || !t.updatedAt) return false
-    return (Date.now() - new Date(t.updatedAt).getTime()) / 3_600_000 > STUCK_HOURS
-  })
-  if (stuckTask) return {
-    task:     stuckTask,
-    reason:   `בביצוע מעל ${STUCK_HOURS} שעות — סגור, פרק, או בטל`,
-    tag:      '⚠ תקוע', tagColor: 'bg-red-100 text-red-700',
-  }
-
-  // P3 — critical in today/week
-  const critical = active.find(t =>
-    normPriority(t.priority) === 'critical' && (t.status === 'today' || t.status === 'week')
-  )
-  if (critical) return {
-    task:     critical,
-    reason:   'משימה קריטית מחכה — אל תתן לה לחכות',
-    tag:      '🔴 קריטי', tagColor: 'bg-red-100 text-red-700',
-  }
-
-  // P3.5 — critical unlinked task (noise risk — name it explicitly)
-  const criticalUnlinked = active.find(t =>
-    !t.goalRef && normPriority(t.priority) === 'critical' && t.status === 'today'
-  )
-  if (criticalUnlinked) return {
-    task:     criticalUnlinked,
-    reason:   'קריטי אבל לא מחובר ליעד — סגור אותה, אחר כך חבר ליעד',
-    tag:      '🔴 ללא יעד', tagColor: 'bg-red-100 text-red-700',
-  }
-
-  // P4 — high priority today
-  const highToday = active.find(t =>
-    normPriority(t.priority) === 'high' && t.status === 'today'
-  )
-  if (highToday) return {
-    task:     highToday,
-    reason:   'עדיפות גבוהה ב"היום" — זה מה שמניע הכנסות',
-    tag:      'גבוה', tagColor: 'bg-orange-100 text-orange-700',
-  }
-
-  // P4.5 — too many unlinked tasks (from summary or live count) — surface the noise
-  if (unlinked.length >= 4) return {
-    task:     unlinked[0],
-    reason:   `${unlinked.length} משימות ללא יעד — זו אחת מהן. חבר ליעד או בטל.`,
-    tag:      '⚠ ללא יעד', tagColor: 'bg-amber-100 text-amber-700',
-  }
-
-  // P5 — anything in today
-  const anyToday = active.find(t => t.status === 'today')
-  if (anyToday) return {
-    task:     anyToday,
-    reason:   'המשימה הבאה בתור — סגור אותה ואז הבא',
-    tag:      'היום', tagColor: 'bg-amber-100 text-amber-700',
-  }
-
-  return null
-}
+// pickNextBest removed — unified into getNextBestTaskWithContext in executionEngine.js
 
 // ─── Weekly Progress Strip ────────────────────────────────────────────────────
 function WeeklyProgress({ tasks, onCloseWeek }) {
@@ -347,10 +271,8 @@ function ExecutionPulse({ tasks }) {
 
 // ─── Next Best Task ───────────────────────────────────────────────────────────
 function NextBestTask({ tasks, onMove, onFocus }) {
-  // Use the new execution engine first; fall back to legacy picker for edge cases
-  const engineResult = useMemo(() => getNextBestTask(tasks), [tasks])
-  const legacyResult = useMemo(() => pickNextBest(tasks), [tasks])
-  const result = engineResult || legacyResult
+  // Single unified execution engine — no more dual-engine fallback
+  const result = useMemo(() => getNextBestTaskWithContext(tasks), [tasks])
 
   if (!result) return (
     <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 text-center text-sm text-slate-400 shadow-sm">
@@ -358,12 +280,7 @@ function NextBestTask({ tasks, onMove, onFocus }) {
     </div>
   )
 
-  // Normalise: engine returns { task, reason, score }; legacy returns { task, reason, tag, tagColor }
-  const task   = result.task
-  const reason = result.reason
-  const score  = result.score ?? computeExecutionScore(task)
-  const tag    = result.tag    ?? (task.isBigThree ? '★ Big 3' : task.status === 'doing' ? '⚡ בביצוע' : 'הבא')
-  const tagColor = result.tagColor ?? 'bg-brand-100 text-brand-700'
+  const { task, reason, score, tag, tagColor } = result
 
   const tMeta = TYPE_META[task.type] || TYPE_META.strategy
 
@@ -1338,7 +1255,15 @@ function AntiNoisePanel({ tasks, onMove, onDelete, onEdit }) {
                 <div className="flex items-center gap-1 shrink-0">
                   {actionStatus && (
                     <button
-                      onClick={() => { onMove(task.id, actionStatus); dismiss(task.id) }}
+                      onClick={() => {
+                        // '__delete__' = hard delete (stale backlog); anything else = status move
+                        if (actionStatus === '__delete__') {
+                          onDelete(task.id)
+                        } else {
+                          onMove(task.id, actionStatus)
+                        }
+                        dismiss(task.id)
+                      }}
                       className="text-[10px] font-bold text-white bg-slate-600 hover:bg-slate-700 px-2 py-1 rounded-lg transition-colors"
                     >
                       {action}

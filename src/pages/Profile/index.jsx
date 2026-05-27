@@ -4,14 +4,16 @@
  */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, ArrowRight, User, Mail, Briefcase, AlertTriangle } from 'lucide-react'
+import { Check, ArrowRight, User, Mail, Briefcase, AlertTriangle, LogOut } from 'lucide-react'
 import TopBar from '../../components/layout/TopBar.jsx'
 import { useStore } from '../../hooks/useStore.js'
+import { useAuth } from '../../hooks/useAuth.js'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function Profile() {
   const { profile, updateProfile, resetAll } = useStore()
+  const { signOut, isAuthenticated } = useAuth()
   const navigate = useNavigate()
 
   const [name,         setName]         = useState(profile?.name         || '')
@@ -41,6 +43,11 @@ export default function Profile() {
   function handleReset() {
     resetAll()
     navigate('/setup', { replace: true })
+  }
+
+  async function handleSignOut() {
+    await signOut()
+    navigate('/auth', { replace: true })
   }
 
   return (
@@ -147,6 +154,17 @@ export default function Profile() {
             </p>
           </div>
         </div>
+
+        {/* Sign out */}
+        {isAuthenticated && (
+          <button
+            onClick={handleSignOut}
+            className="w-full flex items-center justify-center gap-2 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 text-sm font-semibold rounded-xl transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            התנתק
+          </button>
+        )}
 
         {/* Danger zone */}
         <div className="border border-red-100 rounded-xl overflow-hidden">
