@@ -1,0 +1,1 @@
+import{t as e}from"./jsx-runtime-DWSWI4JT.js";var t=e();function n({children:e,className:n=``,onClick:r,hover:i=!1}){return(0,t.jsx)(`div`,{className:`bg-white rounded-2xl border border-slate-200/80 shadow-card ${i||r?`hover:shadow-card-hover hover:border-slate-300 transition-all duration-200 cursor-pointer`:``} ${n}`,onClick:r,children:e})}export{n as t};

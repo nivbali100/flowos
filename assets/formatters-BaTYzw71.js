@@ -1,0 +1,1 @@
+function e(e){return e==null?`—`:e>=1e3?`₪${(e/1e3).toFixed(e%1e3==0?0:1)}K`:`₪${e.toLocaleString(`he-IL`)}`}function t(e,t){return t?Math.min(100,Math.round(e/t*100)):0}function n(e){if(!e)return`לא עודכן`;let t=Math.floor((Date.now()-new Date(e).getTime())/(1e3*60*60*24));return t===0?`היום`:t===1?`אתמול`:`לפני ${t} ימים`}export{n,t as r,e as t};
