@@ -2,7 +2,7 @@ import PeriodBreadcrumb from './PeriodBreadcrumb.jsx'
 
 export default function TopBar({ title, subtitle, action }) {
   return (
-    <div className="sticky top-0 z-40 flex flex-col gap-0.5 px-4 pt-4 pb-3 md:px-6 border-b border-slate-100/80 bg-white/90 backdrop-blur-md">
+    <div className="sticky top-0 z-40 flex flex-col gap-0.5 px-4 pt-4 pb-3 md:px-6 border-b border-slate-100/80 bg-white md:bg-white/90 md:backdrop-blur-md">
       <PeriodBreadcrumb />
       <div className="flex items-center justify-between mt-1 gap-2">
         <div className="flex items-baseline gap-2 min-w-0">

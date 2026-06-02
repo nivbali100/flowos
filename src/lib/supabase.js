@@ -7,6 +7,32 @@ import { createClient } from '@supabase/supabase-js'
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL  || 'https://lgvncozlqtbaxbkdjmms.supabase.co'
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON || null
 
+// ─── Environment mode ─────────────────────────────────────────────────────────
+
+/**
+ * TRUE when running without a Supabase ANON key (e.g. port 5191 dev mode).
+ *
+ * In noauth mode:
+ *   - All Supabase operations are disabled — nothing is persisted remotely.
+ *   - The execution timeline is local-only (localStorage/IndexedDB).
+ *   - This environment MUST NOT be used as an Execution Source of Truth.
+ *   - Nivos must never read data originating from a noauth session.
+ *
+ * Set VITE_SUPABASE_ANON in your .env file to enable persistence.
+ */
+export const IS_NOAUTH_MODE = !SUPABASE_ANON
+
+if (IS_NOAUTH_MODE) {
+  console.warn(
+    '[FlowOS] ⚠️  NOAUTH MODE — Supabase persistence is DISABLED.\n' +
+    '  • No execution events will be written to the database.\n' +
+    '  • No task data will sync to the cloud.\n' +
+    '  • This session CANNOT be used as an Execution Source of Truth.\n' +
+    '  • Nivos will NOT receive data from this environment.\n' +
+    '  Set VITE_SUPABASE_ANON in .env to enable persistence.'
+  )
+}
+
 // Only initialize Supabase if we have a valid key — avoids crash when deployed without env vars
 export const supabase = SUPABASE_ANON
   ? createClient(SUPABASE_URL, SUPABASE_ANON)
@@ -227,57 +253,150 @@ export async function fetchAllWeeklyForms() {
   }
 }
 
+// ─── Task Offline Queue ───────────────────────────────────────────────────────
+// Mirrors the execution_events queue pattern. Failed upserts/deletes are written
+// to localStorage and retried on the next `window.online` event.
+
+const TASK_QUEUE_KEY  = 'flowos:task-queue'
+const MAX_TASK_RETRIES = 5
+
+function _readTaskQueue() {
+  try {
+    const raw = localStorage.getItem(TASK_QUEUE_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function _writeTaskQueue(entries) {
+  try {
+    // Cap at 200 to avoid quota issues; trim oldest first
+    localStorage.setItem(TASK_QUEUE_KEY, JSON.stringify(entries.slice(-200)))
+  } catch { /* best-effort, non-critical */ }
+}
+
+async function _flushTaskQueueInternal() {
+  if (!supabase || !navigator.onLine) return
+  const queue = _readTaskQueue()
+  if (!queue.length) return
+
+  const remaining = []
+  for (const entry of queue) {
+    if ((entry.retries || 0) >= MAX_TASK_RETRIES) continue  // permanently drop
+
+    let ok = false
+    try {
+      if (entry.op === 'upsert' && entry.row) {
+        const { error } = await supabase
+          .from('flowos_tasks')
+          .upsert(entry.row, { onConflict: 'coach_email,task_id' })
+        ok = !error
+      } else if (entry.op === 'delete' && entry.taskId) {
+        // Deletes are idempotent — treat any non-network error as success
+        await supabase
+          .from('flowos_tasks')
+          .delete()
+          .eq('coach_email', entry.coachEmail)
+          .eq('task_id', entry.taskId)
+        ok = true
+      }
+    } catch { ok = false }
+
+    if (!ok) remaining.push({ ...entry, retries: (entry.retries || 0) + 1 })
+  }
+  _writeTaskQueue(remaining)
+}
+
+// Flush on reconnect (module-level — runs once per page load)
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => { _flushTaskQueueInternal().catch(() => {}) })
+}
+
+/** Force-flush the task offline queue. Safe to call at any time. */
+export async function flushTaskQueue() {
+  return _flushTaskQueueInternal()
+}
+
 // ─── Task Sync ────────────────────────────────────────────────────────────────
 
 /**
  * Upsert a single task to Supabase.
- * Fire-and-forget — never blocks UI.
+ * Offline-safe: failed writes are queued in localStorage and retried on reconnect.
  */
 export async function syncTaskToSupabase(task, coachEmail) {
   if (!supabase || !coachEmail || !task?.id) return
+
+  const row = {
+    coach_email:       coachEmail,
+    task_id:           task.id,
+    title:             task.title             || '',
+    status:            task.status            || 'backlog',
+    priority:          task.priority          || 'medium',
+    type:              task.type              || 'strategy',
+    energy_level:      task.energyLevel       || null,
+    is_big_three:      task.isBigThree        || false,
+    goal_ref:          task.goalRef           || null,
+    goal_type:         task.goalType          || null,
+    estimated_minutes: task.estimatedMinutes  || null,
+    due_date:          task.dueDate           || null,
+    notes:             task.notes             || null,
+    doing_started_at:  task.doingStartedAt    || null,
+    actual_minutes:    task.actualMinutes     || null,
+    moved_to_today_at: task.movedToTodayAt    || null,
+    completed_at:      task.completedAt       || null,
+    updated_at:        new Date().toISOString(),
+  }
+
+  if (!navigator.onLine) {
+    const q = _readTaskQueue()
+    _writeTaskQueue([...q, { op: 'upsert', row, retries: 0 }])
+    return
+  }
+
   try {
-    const row = {
-      coach_email:       coachEmail,
-      task_id:           task.id,
-      title:             task.title             || '',
-      status:            task.status            || 'backlog',
-      priority:          task.priority          || 'medium',
-      type:              task.type              || 'strategy',
-      energy_level:      task.energyLevel       || null,
-      is_big_three:      task.isBigThree        || false,
-      goal_ref:          task.goalRef           || null,
-      goal_type:         task.goalType          || null,
-      estimated_minutes: task.estimatedMinutes  || null,
-      due_date:          task.dueDate           || null,
-      notes:             task.notes             || null,
-      doing_started_at:  task.doingStartedAt    || null,
-      actual_minutes:    task.actualMinutes      || null,
-      moved_to_today_at: task.movedToTodayAt    || null,
-      completed_at:      task.completedAt       || null,
-      updated_at:        new Date().toISOString(),
-    }
     const { error } = await supabase
       .from('flowos_tasks')
       .upsert(row, { onConflict: 'coach_email,task_id' })
-    if (error) console.warn('[FlowOS] task sync error:', error.message)
+    if (error) {
+      console.warn('[FlowOS] task sync error:', error.message)
+      const q = _readTaskQueue()
+      _writeTaskQueue([...q, { op: 'upsert', row, retries: 0 }])
+    }
   } catch (e) {
     console.warn('[FlowOS] task sync error:', e)
+    const q = _readTaskQueue()
+    _writeTaskQueue([...q, { op: 'upsert', row, retries: 0 }])
   }
 }
 
 /**
- * Delete a task from Supabase (called on hard delete).
+ * Delete a task from Supabase.
+ * Offline-safe: if offline, the delete is queued and applied on reconnect.
+ * This prevents ghost tasks from re-materialising on cross-device restore.
  */
 export async function deleteTaskFromSupabase(taskId, coachEmail) {
   if (!supabase || !coachEmail || !taskId) return
+
+  if (!navigator.onLine) {
+    const q = _readTaskQueue()
+    _writeTaskQueue([...q, { op: 'delete', taskId, coachEmail, retries: 0 }])
+    return
+  }
+
   try {
-    await supabase
+    const { error } = await supabase
       .from('flowos_tasks')
       .delete()
       .eq('coach_email', coachEmail)
       .eq('task_id', taskId)
+    if (error) {
+      console.warn('[FlowOS] task delete error:', error.message)
+      const q = _readTaskQueue()
+      _writeTaskQueue([...q, { op: 'delete', taskId, coachEmail, retries: 0 }])
+    }
   } catch (e) {
     console.warn('[FlowOS] task delete error:', e)
+    const q = _readTaskQueue()
+    _writeTaskQueue([...q, { op: 'delete', taskId, coachEmail, retries: 0 }])
   }
 }
 

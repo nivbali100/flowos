@@ -3,123 +3,96 @@
  *
  * Append-only event log for Nivos AI integration.
  * Events are:
- *   - Durable: persisted to localStorage + synced to Supabase
- *   - Timestamped: ISO string, UTC
- *   - Versioned: schema_v field for future migrations
- *   - Serializable: plain JSON, no circular refs
- *   - Queryable: indexed by type and timestamp
- *   - Safe for replay: idempotent reads
+ *   - Durable: IndexedDB queue → Supabase + localStorage copy
+ *   - Ordered: sequence field (monotonic per session)
+ *   - Versioned: schema_version for future migrations
+ *   - Validated: Zod schema on every createEvent() call
+ *   - Deduplicated: idempotency_key prevents double-inserts on replay
+ *   - Offline-safe: IndexedDB queue flushes on reconnect
+ *   - Replay-safe: idempotent reads, UNIQUE constraint in Supabase
  *
- * Storage: flowos_events (array, capped at MAX_EVENTS)
- * Supabase: flowos_events table (append-only, read by Nivos webhook)
+ * Storage:
+ *   - IndexedDB:  flowos_event_queue / pending (survives page close)
+ *   - localStorage: flowos_events (capped at MAX_EVENTS, for local reads)
+ *   - Supabase:   flowos_events table (append-only, read by Nivos webhook)
  */
 
-import { supabase } from '../lib/supabase.js'
+import { createEvent, EVENT_TYPES as _CONTRACT_TYPES } from '../lib/events/contract.js'
+import { enqueueEvent } from '../lib/events/queue.js'
 
-const STORAGE_KEY  = 'flowos_events'
-const MAX_EVENTS   = 500   // keep last 500 events locally
-const SCHEMA_V     = 1
+// Re-export from contract so callers don't need to change imports
+export { EVENT_TYPES } from '../lib/events/contract.js'
 
-// ─── Event types ─────────────────────────────────────────────────────────────
-export const EVENT_TYPES = {
-  TASK_CREATED:            'task_created',
-  TASK_UPDATED:            'task_updated',
-  TASK_MOVED:              'task_moved',
-  TASK_COMPLETED:          'task_completed',
-  TASK_DEFERRED:           'task_deferred',       // moved away from today/doing without completing
-  TASK_REOPENED:           'task_reopened',        // moved back from done
-  TASK_ARCHIVED:           'task_archived',        // done → archived on week close
-  TASK_DELETED:            'task_deleted',
-  TASK_STUCK:              'task_stuck',           // in doing > STUCK_HOURS
-  TASK_TOUCH:              'task_touch',           // touchCount incremented
-  WEEK_CLOSED:             'week_closed',
-  BIG3_SET:                'big3_set',
-  BIG3_COMPLETED:          'big3_completed',       // Big3 task marked done
-  FOCUS_SESSION_STARTED:   'focus_session_started',
-  FOCUS_SESSION_COMPLETED: 'focus_session_completed',
-  MORNING_PLAN_COMPLETED:  'morning_plan_completed',
-  GOAL_UPDATED:            'goal_updated',
-}
+const STORAGE_KEY = 'flowos_events'
+const MAX_EVENTS  = 500
 
-// ─── Event factory ────────────────────────────────────────────────────────────
-function makeEvent(type, payload, coachEmail) {
-  return {
-    id:          (typeof crypto !== 'undefined' && crypto.randomUUID)
-                   ? crypto.randomUUID()
-                   : (Date.now().toString(36) + Math.random().toString(36).slice(2)),
-    schema_v:    SCHEMA_V,
-    type,
-    coach_email: coachEmail || null,
-    occurred_at: new Date().toISOString(),
-    payload,     // task snapshot or relevant context (keep small — no subtasks array)
-  }
-}
-
-// ─── Persist locally ─────────────────────────────────────────────────────────
-function persistEvent(event) {
+// ─── Local (localStorage) persistence ────────────────────────────────────────
+function persistLocal(event) {
   try {
     const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
     const next = [event, ...existing].slice(0, MAX_EVENTS)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
   } catch {
-    // Storage full — events are best-effort, never block UI
+    // Storage full — best-effort, never block UI
   }
 }
 
-// ─── Sync to Supabase ─────────────────────────────────────────────────────────
-async function syncEventToSupabase(event) {
-  if (!supabase) return
-  try {
-    await supabase.from('flowos_events').insert({
-      event_id:    event.id,
-      coach_email: event.coach_email,
-      type:        event.type,
-      occurred_at: event.occurred_at,
-      schema_v:    event.schema_v,
-      payload:     event.payload,
-    })
-  } catch {
-    // Fire-and-forget — never block UI
-  }
-}
-
-// ─── Public API ──────────────────────────────────────────────────────────────
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * Emit a behavioral event.
- * Persists locally and fire-and-forgets to Supabase.
+ *
+ * Flow:
+ *   1. createEvent() — validates schema, assigns sequence + idempotency_key
+ *   2. persistLocal() — append to localStorage (capped, for local reads)
+ *   3. enqueueEvent() — write to IndexedDB, then try Supabase immediately
+ *                       (if offline: stays in IDB, flushes on reconnect)
+ *
+ * @param {string} type        - event type (use EVENT_TYPES constants)
+ * @param {object} payload     - event-specific data
+ * @param {string|null} email  - coach email
+ * @returns {object}           - the created event
  */
-export function emitEvent(type, payload, coachEmail) {
-  const event = makeEvent(type, payload, coachEmail)
-  persistEvent(event)
-  syncEventToSupabase(event)
+export function emitEvent(type, payload, email) {
+  const event = createEvent(type, payload, email)
+  persistLocal(event)
+  enqueueEvent(event).catch(() => {})
   return event
 }
 
 /**
- * Emit task lifecycle events with a minimal task snapshot.
- * Strips large fields (subtasks, aiAnalysis) to keep events small.
+ * Emit a task lifecycle event with a minimal task snapshot.
+ * Strips large fields (subtasks) to keep events small.
+ *
+ * @param {string} type        - event type
+ * @param {object} task        - task object from store
+ * @param {object} extra       - additional payload fields (e.g. { to_status })
+ * @param {string|null} email  - coach email
+ * @returns {object}           - the created event
  */
-export function emitTaskEvent(type, task, extra = {}, coachEmail) {
+export function emitTaskEvent(type, task, extra = {}, email) {
   const payload = {
-    task_id:     task.id,
-    title:       task.title,
-    status:      task.status,
-    priority:    task.priority,
-    is_big_three: task.isBigThree || false,
-    goal_ref:    task.goalRef || null,
-    goal_type:   task.goalType || null,
-    energy_level: task.energyLevel || null,
-    touch_count: task.touchCount || 0,
+    task_id:          task.id,
+    title:            task.title,
+    status:           task.status,
+    priority:         task.priority,
+    is_big_three:     task.isBigThree || false,
+    goal_ref:         task.goalRef    || null,
+    goal_type:        task.goalType   || null,
+    energy_level:     task.energyLevel || null,
+    touch_count:      task.touchCount  || 0,
     doing_started_at: task.doingStartedAt || null,
-    completed_at: task.completedAt || null,
+    completed_at:     task.completedAt    || null,
     ...extra,
   }
-  return emitEvent(type, payload, coachEmail)
+  return emitEvent(type, payload, email)
 }
 
+// ─── Read helpers ─────────────────────────────────────────────────────────────
+
 /**
- * Read all local events (for debugging or export).
+ * Read all locally-cached events (localStorage, newest first).
+ * @param {number} limit
  */
 export function getLocalEvents(limit = 100) {
   try {
@@ -129,7 +102,9 @@ export function getLocalEvents(limit = 100) {
 }
 
 /**
- * Read events filtered by type.
+ * Read locally-cached events filtered by type.
+ * @param {string} type
+ * @param {number} limit
  */
 export function getEventsByType(type, limit = 50) {
   return getLocalEvents(MAX_EVENTS).filter(e => e.type === type).slice(0, limit)

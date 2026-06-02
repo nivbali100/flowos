@@ -143,6 +143,7 @@ export default function App() {
               <Route path="/rules"       element={<GameRules />} />
               <Route path="/onboarding"  element={<Onboarding />} />
               <Route path="/"            element={<Navigate to="/weekly" replace />} />
+              <Route path="/journey"     element={<Journey />} />
               <Route path="/dashboard"   element={<Dashboard />} />
               <Route path="/goals"       element={<Goals />} />
               <Route path="/daily"       element={<Daily />} />

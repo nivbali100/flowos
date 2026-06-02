@@ -1,9 +1,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { execSync } from 'child_process'
+
+// Bake build identity into the bundle — readable in Profile page on any device.
+// Falls back gracefully if git is unavailable (e.g. Vercel CI stripped .git).
+let buildHash = 'unknown'
+let buildDate = new Date().toISOString()
+try {
+  buildHash = execSync('git rev-parse --short HEAD', { timeout: 3000 }).toString().trim()
+} catch {}
 
 export default defineConfig({
   base: '/',
+  // Expose build identity to runtime JS via import.meta.env
+  define: {
+    __BUILD_HASH__: JSON.stringify(buildHash),
+    __BUILD_DATE__: JSON.stringify(buildDate),
+  },
   plugins: [
     react(),
     VitePWA({

@@ -54,6 +54,10 @@ import {
   BIG3_ERROR_MS,
 } from '../../constants/app.js'
 import { normPriority, startOfToday } from '../../utils/tasks.js'
+import { computeNearWin, dismissNearWin } from '../../utils/nearWin.js'
+import MorningRitual from './MorningRitual.jsx'
+import EveningRitual from './EveningRitual.jsx'
+import WeeklyOpenModal from './WeeklyOpenModal.jsx'
 
 // ─── Drag & Drop — custom collision detection for multi-column Kanban ─────────
 // pointerWithin first (exact pointer hit), fallback to rectIntersection.
@@ -64,6 +68,13 @@ function kanbanCollision(args) {
   if (hits.length > 0) return hits
   return rectIntersection(args)
 }
+
+// Sensor options defined at module level — MUST be stable references.
+// Inline objects ({ distance: 3 }) would be recreated each render, causing
+// useSensor/useSensors to return new objects → DndContext internal useEffect
+// re-fires every render → "Maximum update depth exceeded" infinite loop.
+const POINTER_SENSOR_OPTIONS = { activationConstraint: { distance: 3 } }
+const TOUCH_SENSOR_OPTIONS   = { activationConstraint: { delay: 250, tolerance: 5 } }
 
 // ─── Meta ──────────────────────────────────────────────────────────────────────
 
@@ -221,7 +232,9 @@ function WeeklyProgress({ tasks, onCloseWeek }) {
 // ─── Execution Pulse ──────────────────────────────────────────────────────────
 // Visual completion blocks — one block per today task, fills green on done.
 function ExecutionPulse({ tasks }) {
-  const sot = startOfToday()
+  // useMemo to stabilize sot — startOfToday() creates a new Date each call,
+  // which would invalidate the todaySlots memo on every render.
+  const sot = useMemo(() => startOfToday(), [])
 
   const todaySlots = useMemo(() => [
     ...tasks.filter(t => t.status === 'today' || t.status === 'doing'),
@@ -350,6 +363,105 @@ function NextBestTask({ tasks, onMove, onFocus }) {
           className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-colors"
         >
           🔍 מיקוד
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Mobile Status Strip ─────────────────────────────────────────────────────
+// Compact 1-row indicator shown above task board on mobile.
+// Shows at-a-glance counts: doing / today / big3 / done — no new data, just task counts.
+function MobileStatusStrip({ tasks }) {
+  const doing = tasks.filter(t => t.status === 'doing').length
+  const today = tasks.filter(t => t.status === 'today').length
+  const big3  = tasks.filter(t => t.isBigThree).length
+  const done  = tasks.filter(t => t.status === 'done').length
+
+  if (tasks.length === 0) return null
+
+  return (
+    <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-2 shadow-sm">
+      {doing > 0 && (
+        <div className="flex items-center gap-1 bg-purple-50 rounded-lg px-2 py-1 shrink-0">
+          <span className="text-xs leading-none">⚡</span>
+          <span className="text-[11px] font-black text-purple-700">{doing} בביצוע</span>
+        </div>
+      )}
+      {today > 0 && (
+        <div className="flex items-center gap-1 bg-brand-50 rounded-lg px-2 py-1 shrink-0">
+          <span className="text-xs leading-none">🎯</span>
+          <span className="text-[11px] font-black text-brand-700">{today} להיום</span>
+        </div>
+      )}
+      {big3 > 0 && (
+        <div className="flex items-center gap-1 bg-amber-50 rounded-lg px-2 py-1 shrink-0">
+          <span className="text-xs leading-none">⭐</span>
+          <span className="text-[11px] font-black text-amber-700">{big3} Big3</span>
+        </div>
+      )}
+      {doing === 0 && today === 0 && big3 === 0 && (
+        <span className="text-[11px] text-slate-400 font-medium">אין משימות פעילות</span>
+      )}
+      <div className="flex-1" />
+      {done > 0 && (
+        <span className="text-[10px] text-slate-400 font-medium shrink-0">✓ {done} בוצעו</span>
+      )}
+    </div>
+  )
+}
+
+// ─── Mobile Next Best Task (compact) ─────────────────────────────────────────
+// Single-row compact version of NextBestTask for mobile — ~50px vs 177px.
+// Same logic (getNextBestTaskWithContext), stripped down to task title + one action.
+function MobileNextBestTask({ tasks, onMove, onFocus }) {
+  const result = useMemo(() => getNextBestTaskWithContext(tasks), [tasks])
+
+  if (!result) return null
+
+  const { task, tag, tagColor } = result
+  const tMeta = TYPE_META[task.type] || TYPE_META.strategy
+
+  return (
+    <div className="bg-slate-900 rounded-xl px-3 py-2.5 flex items-center gap-2.5 shadow-sm">
+      <span className="text-lg leading-none shrink-0">{tMeta.emoji}</span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest shrink-0">▶ הבא</span>
+          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${tagColor}`}>{tag}</span>
+        </div>
+        <p className="text-xs font-black text-white leading-snug truncate">{task.title}</p>
+      </div>
+      <div className="flex gap-1.5 shrink-0">
+        {task.status !== 'today' && task.status !== 'doing' && (
+          <button
+            onClick={() => onMove(task.id, 'today')}
+            className="py-1.5 px-2.5 bg-amber-500 text-white text-[10px] font-bold rounded-lg active:scale-95 transition-transform"
+          >
+            📌 היום
+          </button>
+        )}
+        {(task.status === 'today' || task.status === 'week') && (
+          <button
+            onClick={() => onMove(task.id, 'doing')}
+            className="py-1.5 px-2.5 bg-purple-600 text-white text-[10px] font-bold rounded-lg active:scale-95 transition-transform"
+          >
+            ⚡ עכשיו
+          </button>
+        )}
+        {task.status === 'doing' && (
+          <button
+            onClick={() => onMove(task.id, 'done')}
+            className="py-1.5 px-2.5 bg-green-500 text-white text-[10px] font-bold rounded-lg active:scale-95 transition-transform"
+          >
+            ✓ סגור
+          </button>
+        )}
+        <button
+          onClick={() => onFocus(task.id)}
+          className="py-1.5 px-2 bg-white/10 text-white text-[10px] font-bold rounded-lg active:scale-95 transition-transform"
+        >
+          🔍
         </button>
       </div>
     </div>
@@ -687,6 +799,7 @@ function SortableTaskWrapper({ id, children }) {
   return (
     <div
       ref={setNodeRef}
+      data-task-id={id}
       style={style}
       {...attributes}
       {...listeners}
@@ -703,7 +816,7 @@ function SortableTaskWrapper({ id, children }) {
  * Ghost card shown in DragOverlay during an active drag.
  * Intentionally simplified — no interactive elements.
  */
-function DragGhost({ task }) {
+function DragGhost({ task, width }) {
   if (!task) return null
   const pKey  = normPriority(task.priority)
   const pMeta = PRIORITY_META[pKey] || PRIORITY_META.medium
@@ -716,10 +829,13 @@ function DragGhost({ task }) {
     : 'bg-slate-200'
 
   return (
-    <div className={`rounded-xl border-2 border-brand-400 shadow-2xl w-72 overflow-hidden rotate-[1.5deg] scale-[1.03] ${
+    <div className={`rounded-xl border-2 border-brand-400 shadow-2xl overflow-hidden rotate-[1.5deg] scale-[1.03] ${
       task.isBigThree ? 'bg-gradient-to-br from-brand-50 to-white' : 'bg-white'
     }`}
-      style={{ boxShadow: '0 20px 60px rgba(99,102,241,0.3), 0 8px 24px rgba(0,0,0,0.15)' }}>
+      style={{
+        width: width ? `${width}px` : '100%',
+        boxShadow: '0 20px 60px rgba(99,102,241,0.3), 0 8px 24px rgba(0,0,0,0.15)'
+      }}>
       {/* Priority strip */}
       <div className={`h-1 w-full ${stripColor}`} />
       <div className="px-3 pt-2.5 pb-3">
@@ -856,9 +972,9 @@ function Column({ col, tasks, quarterly, monthly, period, onAdd, onMove, onDelet
         </div>
       )}
 
-      {/* Quick add — hidden during focus mode */}
+      {/* Quick add — desktop only above tasks. Mobile version lives below task list. */}
       {col.canAdd && !focusModeId && (
-        <div className="mb-3">
+        <div className="hidden md:block mb-3">
           <QuickAddForm colId={col.id} onAdd={onAdd} />
         </div>
       )}
@@ -921,6 +1037,13 @@ function Column({ col, tasks, quarterly, monthly, period, onAdd, onMove, onDelet
         </div>
       </SortableContext>
 
+      {/* Quick add — mobile only, below task list so tasks are immediately visible */}
+      {col.canAdd && !focusModeId && (
+        <div className="md:hidden mt-3">
+          <QuickAddForm colId={col.id} onAdd={onAdd} />
+        </div>
+      )}
+
       {/* T3-A: goal-driven suggestions in backlog */}
       {suggestions.length > 0 && (
         <div className="mt-3 pt-3 border-t border-dashed border-slate-200">
@@ -962,6 +1085,121 @@ function PerfectDayBanner({ tasks }) {
     </div>
   )
   return null
+}
+
+// ─── Near Win Block (Variant A + B inline) ───────────────────────────────────
+function NearWinBlock({ nearWin, onFocus, onDismiss }) {
+  if (!nearWin) return null
+  const { variant, remainingTask, lastBig3, big3Done, personalBest, current, firstName } = nearWin
+
+  // Variant A: Perfect Day
+  if (variant === 'A') {
+    return (
+      <div className="mb-4 relative rounded-2xl overflow-hidden" style={{ padding: '1.5px', background: 'linear-gradient(135deg, #f59e0b, #fbbf24, #f59e0b, #d97706)' }}>
+        <div className="bg-amber-50 rounded-2xl px-4 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">משימה אחת מיום שלם</p>
+              <p className="text-sm font-black text-slate-900 leading-snug mb-0.5">
+                "{remainingTask.title}"
+              </p>
+              <p className="text-xs text-amber-700">תסגור את זה ואתה מסיים יום שלם.</p>
+            </div>
+            <button onClick={() => onDismiss('A')} className="text-amber-400 hover:text-amber-600 shrink-0 mt-0.5">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <button
+            onClick={() => { onFocus(remainingTask.id); onDismiss('A') }}
+            className="mt-3 w-full py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-black rounded-xl transition-colors"
+          >
+            → התחיל עכשיו
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Variant B: Big3 Close
+  if (variant === 'B') {
+    return (
+      <div className="mb-4 relative rounded-2xl overflow-hidden" style={{ padding: '1.5px', background: 'linear-gradient(135deg, #7c3aed, #8b5cf6, #6d28d9, #7c3aed)' }}>
+        <div className="bg-indigo-50 rounded-2xl px-4 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">שבוע מושלם — משימה אחת</p>
+              <p className="text-sm font-black text-slate-900 leading-snug mb-1">
+                {big3Done}/3 גדולים נסגרו. נשאר: "{lastBig3.title}"
+              </p>
+              <p className="text-xs text-indigo-700">פאונדרים שסוגרים Big3 — מייצרים תנופה לא ניתנת לעצירה.</p>
+            </div>
+            <button onClick={() => onDismiss('B')} className="text-indigo-400 hover:text-indigo-600 shrink-0 mt-0.5">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <button
+            onClick={() => { onFocus(lastBig3.id); onDismiss('B') }}
+            className="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black rounded-xl transition-colors"
+          >
+            → {lastBig3.title.length > 30 ? lastBig3.title.slice(0, 30) + '…' : lastBig3.title}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return null
+}
+
+// ─── Near Win Overlay (Variant C — Personal Best) ────────────────────────────
+function NearWinOverlay({ nearWin, onDismiss }) {
+  const [canDismiss, setCanDismiss] = useState(false)
+  useEffect(() => {
+    if (!nearWin || nearWin.variant !== 'C') return
+    const t = setTimeout(() => setCanDismiss(true), 3000)
+    return () => clearTimeout(t)
+  }, [nearWin])
+
+  if (!nearWin || nearWin.variant !== 'C') return null
+  const { personalBest, current, firstName } = nearWin
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center animate-[scale-in_0.4s_cubic-bezier(0.34,1.56,0.64,1)]">
+        <div className="text-4xl mb-3">🏆</div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">שיא אישי בהישג יד</p>
+        <p className="text-xl font-black text-slate-900 leading-snug mb-2">
+          עוד משימה אחת ושברת את עצמך
+        </p>
+        <div className="flex items-center justify-center gap-3 my-4">
+          <div className="text-center">
+            <div className="text-3xl font-black text-slate-300">{current}</div>
+            <div className="text-[10px] text-slate-400">עכשיו</div>
+          </div>
+          <div className="text-2xl text-slate-300">→</div>
+          <div className="text-center">
+            <div className="text-3xl font-black text-green-600">{personalBest}</div>
+            <div className="text-[10px] text-green-600 font-bold">שיא</div>
+          </div>
+        </div>
+        <p className="text-sm text-slate-600 mb-5">
+          {firstName ? `${firstName} — ` : ''}משימה אחת עומדת בין אתה של היום לאתה הכי טוב.
+        </p>
+        {canDismiss ? (
+          <button
+            onClick={() => onDismiss('C')}
+            className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-xl transition-colors"
+          >
+            → לוח השבועי
+          </button>
+        ) : (
+          <div className="w-full py-3 bg-slate-100 text-slate-400 font-black rounded-xl text-sm">
+            רגע...
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 // ─── T1-D: Carryover Detection Banner ────────────────────────────────────────
@@ -1006,6 +1244,185 @@ function CarryoverBanner({ tasks, onMove, onDelete }) {
             <button onClick={() => onDelete(t.id)} className="text-slate-300 hover:text-red-400 transition-colors shrink-0"><X className="w-3 h-3" /></button>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Streak Stage Detection ───────────────────────────────────────────────────
+// Returns stage config for a given streak day count.
+// Used by ConsistencyProtectionBanner, StreakBadge, and ritual components.
+function getStreakStage(days) {
+  if (days >= 100) return {
+    id: '100', emoji: '💎',
+    badge: `${days} ימים`,
+    morningGreeting: `יום ${days} של איש שלא מוותר.`,
+    eveningClose: `יום ${days}. שם שאנשים רוצים להגיע. ואתה כבר שם.`,
+    identityStatement: 'יש רשימה קצרה מאוד של אנשים שמגיעים לפה. שמך נמצא עליה.',
+  }
+  if (days >= 60) return {
+    id: '60', emoji: '🔱',
+    badge: `${days} ימים`,
+    morningGreeting: `בוקר ${days}. מעטים מגיעים לפה.`,
+    eveningClose: 'שישים יום. זה לא עוד אפליקציה. זה המערכת שלך.',
+    identityStatement: 'יש אנשים שמתכננים. יש אנשים שמבצעים. ואתה כבר בקטגוריה שלישית — אנשים שממשיכים.',
+  }
+  if (days >= 30) return {
+    id: '30', emoji: '🏔️',
+    badge: `${days} ימים`,
+    morningGreeting: `יום ${days}. ליזמים עם שגרה יש משהו שלאחרים אין.`,
+    eveningClose: 'חודש. פה מתחיל ההבדל האמיתי.',
+    identityStatement: 'חודש שלם. אתה לא "מנסה להיות עקבי". אתה עקבי.',
+  }
+  if (days >= 14) return {
+    id: '14', emoji: '⚡',
+    badge: `${days} ימים`,
+    morningGreeting: `יום ${days}. זה כבר חלק ממך.`,
+    eveningClose: 'שבועיים. הגוף שלך כבר מצפה לזה.',
+    identityStatement: 'אחרי שבועיים, זה כבר לא רצון. זה מבנה.',
+  }
+  if (days >= 7) return {
+    id: '7', emoji: '🔥',
+    badge: `${days} ימים`,
+    morningGreeting: 'שבוע+ ולא הפסקת.',
+    eveningClose: 'שבוע שלם. זה לא מקרה.',
+    identityStatement: 'אנשים שמגיעים לשבוע — ממשיכים. אתה כבר בצד השני.',
+  }
+  // Stage 1: 1–6 days — no sub-lines, just show the count
+  return {
+    id: '1', emoji: '',
+    badge: days > 0 ? `יום ${days}` : '',
+    morningGreeting: null,
+    eveningClose: null,
+    identityStatement: 'רוב האנשים מתכוונים להתחיל. אתה כבר התחלת.',
+  }
+}
+
+// ─── Streak Badge ─────────────────────────────────────────────────────────────
+// Persistent small chip showing current stage emoji + day count. Always visible
+// when streak >= 3. No tap behavior in this release.
+function StreakBadge({ stage }) {
+  return (
+    <div className="mb-3 flex items-center">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-full text-xs font-black text-slate-700">
+        {stage.emoji && <span>{stage.emoji}</span>}
+        <span>{stage.badge}</span>
+      </span>
+    </div>
+  )
+}
+
+// ─── Consistency Protection Banner ───────────────────────────────────────────
+// Shows when: streak >= 3, no completion today, hour >= 17, not dismissed today
+// "Protection" framing — never shame. Monthly freeze mechanic.
+function ConsistencyProtectionBanner({ streak, tasks }) {
+  const DISMISS_KEY = 'flowos_consistency_dismissed'
+  const FREEZE_KEY  = 'flowos_streak_freeze'
+  const now         = new Date()
+  const hour        = now.getHours()
+  const today       = now.toDateString()
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+  const [dismissed, setDismissed] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(DISMISS_KEY) || 'null')?.date === today } catch { return false }
+  })
+  const [freezeData, setFreezeData] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(FREEZE_KEY) || '{"usedMonths":[]}') } catch { return { usedMonths: [] } }
+  })
+  const [showSuccess, setShowSuccess] = useState(false)
+
+  // Compute conditions
+  const doneToday = useMemo(() => {
+    const sot = new Date(); sot.setHours(0, 0, 0, 0)
+    return tasks.filter(t => t.completedAt && new Date(t.completedAt) >= sot).length
+  }, [tasks])
+
+  const shouldShow = (
+    streak.days >= 3 &&
+    streak.lastDate !== today &&
+    doneToday === 0 &&
+    hour >= 17 &&
+    !dismissed
+  )
+
+  // Watch for completion — show success state
+  useEffect(() => {
+    if (doneToday > 0 && streak.lastDate !== today) {
+      // task just completed — show quiet success
+      setShowSuccess(true)
+      const t = setTimeout(() => setShowSuccess(false), 3000)
+      return () => clearTimeout(t)
+    }
+  }, [doneToday]) // eslint-disable-line
+
+  const freezeAvailable = !freezeData.usedMonths.includes(currentMonth)
+
+  function handleDismiss() {
+    try { localStorage.setItem(DISMISS_KEY, JSON.stringify({ date: today })) } catch {}
+    setDismissed(true)
+  }
+
+  function handleFreeze() {
+    const updated = { usedMonths: [...freezeData.usedMonths, currentMonth] }
+    try { localStorage.setItem(FREEZE_KEY, JSON.stringify(updated)) } catch {}
+    setFreezeData(updated)
+    // Update streak lastDate to today so it doesn't reset tomorrow
+    try {
+      const raw = JSON.parse(localStorage.getItem('flowos_streak') || '{"days":0,"lastDate":null}')
+      localStorage.setItem('flowos_streak', JSON.stringify({ ...raw, lastDate: today }))
+    } catch {}
+    handleDismiss()
+  }
+
+  // Quiet success confirmation
+  if (showSuccess && doneToday > 0) {
+    return (
+      <div className="mb-4 rounded-xl bg-green-50 border border-green-200 px-4 py-2.5 flex items-center gap-2">
+        <span className="text-green-600 font-black text-sm">{streak.days + 1} ימים של עקביות ✓</span>
+      </div>
+    )
+  }
+
+  if (!shouldShow) return null
+
+  function getCopy() {
+    const n = streak.days
+    const stage = getStreakStage(n)
+    if (n < 7) return { title: `${stage.badge} של עקביות`, body: 'שמור על הרצף היום.' }
+    return {
+      title: `${stage.badge}${stage.emoji ? ` ${stage.emoji}` : ''}`,
+      body: stage.eveningClose || 'שמור על הרצף היום.',
+    }
+  }
+  const copy = getCopy()
+
+  return (
+    <div className="mb-4 rounded-xl border-r-4 border-r-amber-500 bg-amber-50 border border-amber-200 px-4 py-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-black text-amber-900 leading-snug">{copy.title}</p>
+          <p className="text-xs text-amber-700 mt-0.5">{copy.body}</p>
+        </div>
+        <button onClick={handleDismiss} className="text-amber-400 hover:text-amber-600 shrink-0">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="flex gap-2 mt-3">
+        <a
+          href="#today"
+          onClick={handleDismiss}
+          className="flex-1 text-center py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-xl transition-colors"
+        >
+          בצע משימה אחת →
+        </a>
+        {freezeAvailable && (
+          <button
+            onClick={handleFreeze}
+            className="px-3 py-2 bg-white border border-amber-300 text-amber-700 text-xs font-bold rounded-xl hover:bg-amber-50 transition-colors whitespace-nowrap"
+          >
+            ❄️ הקפא יום
+          </button>
+        )}
       </div>
     </div>
   )
@@ -1091,7 +1508,7 @@ function MorningPlanModal({ onClose, onAdd, addXP }) {
   const totalMin = created.reduce((s, t) => s + (t.estimatedMinutes || 0), 0)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 px-3 pb-2 md:pb-0 md:px-4">
+    <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/50 px-3 pb-2 md:pb-0 md:px-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85dvh] md:max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-slate-100 shrink-0">
           <div>
@@ -1422,9 +1839,20 @@ function checkHasGoals(monthly, quarterly) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function Weekly() {
-  const { tasks, addTask, updateTask, deleteTask, moveTask, setBigThree, bulkMoveTask, reorderTasks, restoreTask, monthly, quarterly, profile, awardXP, closeWeek } = useStore()
+  const { tasks, addTask, updateTask, deleteTask, moveTask, setBigThree, bulkMoveTask, reorderTasks, restoreTask, monthly, quarterly, profile, awardXP, closeWeek, streak, setupComplete } = useStore()
+  const streakStage = useMemo(() => getStreakStage(streak.days), [streak.days])
   const period = usePeriod()
   const [activeTab,      setActiveTab]     = useState('backlog')
+  // JS-based desktop detection — prevents duplicate dnd-kit droppable registrations.
+  // CSS-only (hidden/md:hidden) still renders BOTH sets in the DOM, causing zero-rect
+  // droppables from the hidden set to overwrite valid rects in dnd-kit's registry.
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const update = (e) => setIsDesktop(e.matches)
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
   const [editingTask,    setEditing]       = useState(null)
   const [big3Error,      setBig3Error]     = useState(false)
   const [focusModeId,    setFocusMode]     = useState(null)
@@ -1432,8 +1860,71 @@ export default function Weekly() {
   const [showMorning,    setShowMorning]   = useState(false)   // T2-C
   const [search,         setSearch]        = useState('')      // T2-A
   const [activeFilter,   setActiveFilter]  = useState('all')   // T2-A
+  const [filterOpen,     setFilterOpen]    = useState(false)   // mobile collapsed filter
+  // Defer below-fold mobile secondary widgets until after first paint.
+  // On mobile the user sees tasks immediately; secondary content (progress, brain, streaks)
+  // loads in the next animation frame — invisible latency, real render cost savings.
+  const [showMobileSecondary, setShowMobileSecondary] = useState(false)
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setShowMobileSecondary(true))
+    return () => cancelAnimationFrame(raf)
+  }, [])
   const [showCelebration, setShowCelebration] = useState(false)
+  const [celebrationIntent, setCelebrationIntent] = useState(null)
   const [mobileMovingTask, setMobileMovingTask] = useState(null)  // mobile move sheet
+
+  // ── Near Win ─────────────────────────────────────────────────────────────
+  const [nearWinKey, setNearWinKey] = useState(0)
+
+  const weeklySummariesForNearWin = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('flowos_weekly_summaries') || '[]') } catch { return [] }
+  }, [])
+
+  const nearWin = useMemo(() => {
+    return computeNearWin(tasks, weeklySummariesForNearWin, profile?.name?.split(' ')[0] || '')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, weeklySummariesForNearWin, nearWinKey, profile?.name])
+
+  function handleNearWinDismiss(variant) {
+    dismissNearWin(variant)
+    setNearWinKey(k => k + 1) // force recompute
+  }
+
+  // ── Morning Ritual auto-trigger ──────────────────────────────────────────
+  const [showMorningRitual, setShowMorningRitual] = useState(() => {
+    const today = new Date().toDateString()
+    const hour = new Date().getHours()
+    try {
+      if (localStorage.getItem('flowos_morning_date') === today) return false
+    } catch {}
+    return hour >= 5 && hour < 12 && !!localStorage.getItem('flowos_setup_complete')
+  })
+
+  // ── Evening Ritual auto-trigger ──────────────────────────────────────────
+  const [showEveningRitual, setShowEveningRitual] = useState(() => {
+    const today = new Date().toDateString()
+    const hour = new Date().getHours()
+    try {
+      if (localStorage.getItem('flowos_evening_date') === today) return false
+    } catch {}
+    return hour >= 17 && hour < 23 && !!localStorage.getItem('flowos_setup_complete')
+  })
+
+  // ── Weekly Open auto-trigger ─────────────────────────────────────────────
+  const [showWeeklyOpen, setShowWeeklyOpen] = useState(() => {
+    const now = new Date()
+    const day = now.getDay()   // 0=Sun, 1=Mon
+    const hour = now.getHours()
+    // Get Monday of current week
+    const monday = new Date(now)
+    const diff = (day === 0) ? -6 : 1 - day
+    monday.setDate(now.getDate() + diff)
+    const weekId = 'week-' + monday.toISOString().slice(0, 10)
+    try {
+      if (localStorage.getItem('flowos_week_opened') === weekId) return false
+    } catch {}
+    return (day === 0 || day === 1) && hour < 17 && !!localStorage.getItem('flowos_setup_complete')
+  })
 
   // ── Undo Toast ──────────────────────────────────────────────────────────
   const [undoQueue,  setUndoQueue]  = useState([])
@@ -1481,8 +1972,18 @@ export default function Weekly() {
     }
     handleMoveTask(id, newStatus)
     if (newStatus === 'done') {
+      let intentText = null
+      if (task.isBigThree) {
+        try {
+          const raw = JSON.parse(localStorage.getItem('flowos_daily_intent') || 'null')
+          if (raw && raw.date === new Date().toDateString() && raw.text?.trim()) {
+            intentText = raw.text.trim()
+          }
+        } catch {}
+      }
+      setCelebrationIntent(intentText)
       setShowCelebration(true)
-      setTimeout(() => setShowCelebration(false), 1800)
+      setTimeout(() => { setShowCelebration(false); setCelebrationIntent(null) }, 1800)
     }
     const colLabel = COLUMNS.find(c => c.id === newStatus)?.label ?? newStatus
     pushUndo({
@@ -1499,26 +2000,38 @@ export default function Weekly() {
   const [activeDragId, setActiveDragId] = useState(null)
   const activeDragTask = activeDragId ? tasks.find(t => t.id === activeDragId) : null
 
+  // dragOverColumnRef tracks the last column the pointer hovered during drag.
+  // We use a ref (not state) to avoid triggering re-renders that would cause
+  // SortableTaskWrapper to unmount/remount between columns, which in turn changes
+  // dnd-kit's `activeNode` reference → fires useRect's useLayoutEffect repeatedly
+  // → "Maximum update depth exceeded" with React 19 + dnd-kit v6.
+  const dragOverColumnRef = useRef(null)
+
+  // Captures the exact pixel width of the dragged card so DragOverlay matches it.
+  const activeDragWidthRef = useRef(null)
+
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 3 },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: { delay: 250, tolerance: 5 },
-    }),
+    useSensor(PointerSensor, POINTER_SENSOR_OPTIONS),
+    useSensor(TouchSensor,   TOUCH_SENSOR_OPTIONS),
   )
 
   function handleDragStart({ active }) {
     setActiveDragId(active.id)
+    // Capture the source element's exact pixel width so the ghost matches it.
+    // Query the DOM directly (most reliable — works even before dnd-kit measures).
+    const node = document.querySelector(`[data-task-id="${active.id}"]`)
+    activeDragWidthRef.current = node ? node.getBoundingClientRect().width : null
   }
 
   // onDragOver — tracks the current hover target so handleDragEnd can use it
   // as a fallback when the pointer releases over the column background (not on a task).
   // No store mutations here — just records the latest valid column target.
-  const dragOverColumnRef = useRef(null)
-
   function handleDragOver({ active, over }) {
-    if (!over) { dragOverColumnRef.current = null; return }
+    if (!over) {
+      // Pointer between columns — keep last ref so task lands in last valid column.
+      // dragOverColumnRef is intentionally NOT cleared here (fallback for handleDragEnd).
+      return
+    }
     const overId = over.id
     const overIsColumn = COLUMNS.some(c => c.id === overId)
     if (overIsColumn) {
@@ -1531,33 +2044,37 @@ export default function Weekly() {
   }
 
   function handleDragEnd({ active, over }) {
+    const refSnapshot = dragOverColumnRef.current
     setActiveDragId(null)
+    dragOverColumnRef.current = null
 
     const activeId   = active.id
     const activeTask = tasks.find(t => t.id === activeId)
-    if (!activeTask) { dragOverColumnRef.current = null; return }
+    if (!activeTask) return
+
+    const overId       = over?.id ?? null
+    const overIsColumn = overId ? COLUMNS.some(c => c.id === overId) : false
+    const overTask     = (overId && !overIsColumn && overId !== activeId)
+                           ? tasks.find(t => t.id === overId) : null
 
     // Resolve drop target:
     //   1. over.id is a column id       → dropped on empty column droppable
-    //   2. over.id is a task id         → dropped on / between another task
-    //   3. over is null                 → fallback: last valid column from onDragOver
+    //   2. over.id is a task id (other) → dropped on / between another task
+    //   3. over.id === active.id        → dropped on own placeholder (ref fallback)
+    //   4. over is null                 → fallback to last tracked column ref
     let targetColumn = activeTask.status  // default: no move
-    let overId       = over?.id ?? null
 
     if (overId) {
-      const overIsColumn = COLUMNS.some(c => c.id === overId)
-      const overTask     = overIsColumn ? null : tasks.find(t => t.id === overId)
       if (overIsColumn) {
         targetColumn = overId
+      } else if (overId === activeId) {
+        targetColumn = refSnapshot ?? activeTask.status
       } else if (overTask) {
         targetColumn = overTask.status
       }
-    } else if (dragOverColumnRef.current) {
-      // Pointer released over column background (between tasks) — use last tracked column
-      targetColumn = dragOverColumnRef.current
+    } else {
+      targetColumn = refSnapshot ?? activeTask.status
     }
-
-    dragOverColumnRef.current = null
 
     if (targetColumn !== activeTask.status) {
       // ── Cross-column move ─────────────────────────────────────────────────
@@ -1596,6 +2113,23 @@ export default function Weekly() {
     })
     return opts
   }, [quarterly, monthly, period])
+
+  // ── Week ID and intent ───────────────────────────────────────────────────
+  const currentWeekId = useMemo(() => {
+    const now = new Date()
+    const day = now.getDay()
+    const monday = new Date(now)
+    const diff = (day === 0) ? -6 : 1 - day
+    monday.setDate(now.getDate() + diff)
+    return 'week-' + monday.toISOString().slice(0, 10)
+  }, [])
+
+  const weekIntent = useMemo(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('flowos_week_intent') || 'null')
+      return raw?.weekId === currentWeekId ? raw : null
+    } catch { return null }
+  }, [currentWeekId])
 
   // T2-A: filtered tasks for Kanban columns (smart panels always use raw `tasks`)
   const displayTasks = useMemo(() => {
@@ -1660,7 +2194,7 @@ export default function Weekly() {
   const colProps = { tasks: displayTasks, monthly, quarterly, period, onAdd: addTask, onMove: handleMoveWithUndo, onDelete: handleDeleteTask, onEdit: setEditing, onUpdate: updateTask, onToggleBig3: handleToggleBig3, big3Count, focusModeId, onFocus: handleFocus, goalOptions, onBulkMove: bulkMoveTask, isDragActive: !!activeDragId, onMobileMove: (id) => setMobileMovingTask(tasks.find(t => t.id === id) || null) }
 
   // ── Body scroll lock when any modal is open ─────────────────────────────
-  const anyModalOpen = !!(editingTask || showClose || showMorning || capacityWarning)
+  const anyModalOpen = !!(editingTask || showClose || showMorning || capacityWarning || showWeeklyOpen || showEveningRitual)
   useEffect(() => {
     document.body.style.overflow = anyModalOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
@@ -1677,6 +2211,7 @@ export default function Weekly() {
 
   return (
     <div dir="rtl" className={`min-h-screen bg-gradient-to-b from-slate-50 to-white ${focusModeId ? 'pt-14' : ''}`}>
+      <style>{`@keyframes scale-in { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }`}</style>
       {/* Focus mode bar — fixed at top */}
       {focusTask && <FocusModeBar task={focusTask} onExit={() => setFocusMode(null)} />}
 
@@ -1696,6 +2231,11 @@ export default function Weekly() {
       <>
       <div className="px-4 md:px-6 py-4 max-w-6xl mx-auto">
 
+        {/* ── Desktop-only above-task content — hidden on mobile.
+            On mobile, MobileStatusStrip + MobileNextBestTask appear instead (below).
+            This block is display:none on mobile so it takes zero height / scroll. ── */}
+        <div className="hidden md:block">
+
         {/* Weekly Focus Header — hidden during focus mode */}
         {!focusModeId && (
           <div className="mb-4">
@@ -1706,6 +2246,16 @@ export default function Weekly() {
         {/* T1-D: Carryover detection banner */}
         {!focusModeId && (
           <CarryoverBanner tasks={tasks} onMove={handleMoveWithUndo} onDelete={handleDeleteTask} />
+        )}
+
+        {/* Streak Badge — persistent stage indicator, always visible when streak >= 3 */}
+        {!focusModeId && streak.days >= 3 && (
+          <StreakBadge stage={streakStage} />
+        )}
+
+        {/* Consistency Protection — above WeeklyProgress, evening only */}
+        {!focusModeId && (
+          <ConsistencyProtectionBanner streak={streak} tasks={tasks} />
         )}
 
         {/* Execution Pulse + Progress — hidden during focus mode */}
@@ -1735,6 +2285,11 @@ export default function Weekly() {
           <NextBestTask tasks={tasks} onMove={handleMoveWithUndo} onFocus={handleFocus} />
         </div>
 
+        {/* Near Win — position above Big3, fires on open */}
+        {!focusModeId && (nearWin?.variant === 'A' || nearWin?.variant === 'B') && (
+          <NearWinBlock nearWin={nearWin} onFocus={handleFocus} onDismiss={handleNearWinDismiss} />
+        )}
+
         {/* Big 3 */}
         {!focusModeId && <div className="mb-4"><Big3Section tasks={tasks} big3Error={big3Error} /></div>}
 
@@ -1745,8 +2300,10 @@ export default function Weekly() {
           </div>
         )}
 
-        {/* Perfect day */}
-        {!focusModeId && <PerfectDayBanner tasks={tasks} />}
+        {/* Near Win Overlay — Variant C (Personal Best) */}
+        {nearWin?.variant === 'C' && (
+          <NearWinOverlay nearWin={nearWin} onDismiss={handleNearWinDismiss} />
+        )}
 
         {/* Anti-Noise Panel — surface cluttered/stale tasks */}
         {!focusModeId && tasks.length > 3 && (
@@ -1760,14 +2317,63 @@ export default function Weekly() {
           </div>
         )}
 
-        {/* T2-A: Search + Filter Bar */}
+        </div>{/* ── end desktop-only above-task content ── */}
+
+        {/* ── Mobile-only compact overview — shows instead of the big block above ── */}
         {!focusModeId && (
-          <TaskFilterBar search={search} setSearch={setSearch} activeFilter={activeFilter} setActiveFilter={setActiveFilter} />
+          <div className="md:hidden mb-3 space-y-2">
+            <MobileStatusStrip tasks={tasks} />
+            <MobileNextBestTask tasks={tasks} onMove={handleMoveWithUndo} onFocus={handleFocus} />
+          </div>
+        )}
+
+        {/* T2-A: Search + Filter Bar
+            Mobile: collapsed by default — single 44px tap-to-expand row.
+            Desktop: always open (unchanged).
+            Saves 83px on mobile before first task card. */}
+        {!focusModeId && (
+          <>
+            {/* Mobile collapsed trigger row */}
+            <div className="md:hidden flex items-center gap-2 mb-3">
+              <button
+                onClick={() => setFilterOpen(o => !o)}
+                className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-sm flex-1 text-right"
+              >
+                <span className="text-slate-400 text-sm shrink-0">🔍</span>
+                {search ? (
+                  <span className="text-[12px] font-semibold text-slate-700 flex-1 truncate">{search}</span>
+                ) : (
+                  <span className="text-[12px] text-slate-400 flex-1">חיפוש משימות...</span>
+                )}
+                {activeFilter !== 'all' && (
+                  <span className="text-[9px] font-black text-white bg-brand-500 px-1.5 py-0.5 rounded-full shrink-0">
+                    {{ big3: 'Big3', doing: 'בביצוע', noGoal: 'ללא יעד', critical: 'קריטי' }[activeFilter]}
+                  </span>
+                )}
+                {(search || activeFilter !== 'all') && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setSearch(''); setActiveFilter('all'); setFilterOpen(false) }}
+                    className="text-slate-300 hover:text-slate-500 shrink-0 text-xs font-bold"
+                  >✕</button>
+                )}
+                <span className="text-slate-300 text-xs shrink-0">{filterOpen ? '▲' : '▼'}</span>
+              </button>
+            </div>
+            {/* Mobile expanded full bar — only when open */}
+            {filterOpen && (
+              <div className="md:hidden mb-3">
+                <TaskFilterBar search={search} setSearch={setSearch} activeFilter={activeFilter} setActiveFilter={setActiveFilter} />
+              </div>
+            )}
+            {/* Desktop: always visible */}
+            <div className="hidden md:block">
+              <TaskFilterBar search={search} setSearch={setSearch} activeFilter={activeFilter} setActiveFilter={setActiveFilter} />
+            </div>
+          </>
         )}
 
         {/* ── Kanban Board — wrapped in DndContext ─────────────────────── */}
         <DndContext
-          measuring={{ draggable: { measure: (el) => el.getBoundingClientRect() } }}
           sensors={sensors}
           collisionDetection={kanbanCollision}
           onDragStart={handleDragStart}
@@ -1775,56 +2381,89 @@ export default function Weekly() {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          {/* Desktop: 5-column grid */}
-          <div className="hidden md:grid grid-cols-5 gap-4">
-            {COLUMNS.map(col => <Column key={col.id} col={col} {...colProps} />)}
-          </div>
-
-          {/* Mobile: single-column tab view — no horizontal scroll, drag works natively */}
-          <div className="md:hidden">
-            {/* Column tab bar */}
-            <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 mb-3 gap-0.5">
-              {COLUMNS.map(col => {
-                const count = displayTasks.filter(t => t.status === col.id).length
-                return (
-                  <button
-                    key={col.id}
-                    onClick={() => setActiveTab(col.id)}
-                    className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-lg transition-all duration-150 ${
-                      activeTab === col.id
-                        ? `${col.tagBg} shadow-sm`
-                        : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                  >
-                    <span className="text-base leading-none">{col.emoji}</span>
-                    <span className={`text-[9px] font-black mt-0.5 ${activeTab === col.id ? '' : 'text-slate-400'}`}>{col.label}</span>
-                    {count > 0 && (
-                      <span className={`text-[8px] font-bold rounded-full px-1 mt-0.5 ${activeTab === col.id ? 'bg-white/60' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
-                    )}
-                  </button>
-                )
-              })}
+          {/* JS-based desktop/mobile split — only ONE set of Column components in DOM at a time.
+              CSS-only (hidden/md:hidden) renders both sets, causing the hidden set's zero-rect
+              droppables to overwrite valid desktop rects in dnd-kit's registry → over=null on every drag. */}
+          {isDesktop ? (
+            /* Desktop: 5-column grid */
+            <div className="grid grid-cols-5 gap-4">
+              {COLUMNS.map(col => <Column key={col.id} col={col} {...colProps} />)}
             </div>
-            {/* Active column — full width, drag works without carousel interference */}
-            {COLUMNS.map(col => (
-              <div key={col.id} className={col.id === activeTab ? '' : 'hidden'}>
-                <Column col={col} {...colProps} />
+          ) : (
+            /* Mobile: single-column tab view */
+            <div>
+              {/* Column tab bar */}
+              <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 mb-3 gap-0.5">
+                {COLUMNS.map(col => {
+                  const count = displayTasks.filter(t => t.status === col.id).length
+                  return (
+                    <button
+                      key={col.id}
+                      onClick={() => setActiveTab(col.id)}
+                      className={`flex-1 flex flex-col items-center py-1 px-0.5 rounded-lg transition-all duration-150 ${
+                        activeTab === col.id
+                          ? `${col.tagBg} shadow-sm`
+                          : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      <span className="text-sm leading-none">{col.emoji}</span>
+                      <span className={`text-[8px] font-black mt-0.5 leading-none ${activeTab === col.id ? '' : 'text-slate-400'}`}>
+                        {col.label}{count > 0 ? ` ${count}` : ''}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
-            ))}
-          </div>
+              {/* Only render the ACTIVE column — avoids duplicate dnd IDs from other tabs */}
+              {COLUMNS.filter(col => col.id === activeTab).map(col => (
+                <Column key={col.id} col={col} {...colProps} />
+              ))}
+            </div>
+          )}
 
           {/* Ghost card follows cursor during drag */}
-          <DragOverlay dropAnimation={{ duration: 150, easing: 'ease' }}>
-            {activeDragTask ? <DragGhost task={activeDragTask} /> : null}
+          <DragOverlay dropAnimation={null}>
+            {activeDragTask ? <DragGhost task={activeDragTask} width={activeDragWidthRef.current} /> : null}
           </DragOverlay>
         </DndContext>
+
+        {/* ── Mobile secondary content — shown BELOW the task board on mobile.
+            Desktop users see these above the board (inside hidden md:block wrapper).
+            Mobile users scroll down here after interacting with tasks. ── */}
+        {/* ── Mobile secondary content — deferred until after first paint.
+            showMobileSecondary is set via requestAnimationFrame after mount,
+            so the initial render only paints the task board — no compute cost
+            for these heavy widgets until the user's tasks are already visible. ── */}
+        {!focusModeId && showMobileSecondary && (
+          <div className="md:hidden mt-4 space-y-3">
+            <WeeklyFocusHeader monthly={monthly} tasks={tasks} />
+            <WeeklyProgress tasks={tasks} onCloseWeek={() => setShowClose(true)} />
+            {tasks.length > 0 && (
+              <WeeklyStateBanner brain={brain} tasks={tasks} onMove={handleMoveWithUndo} />
+            )}
+            <PressureBanner tasks={tasks} onMove={handleMoveWithUndo} />
+            <Big3Section tasks={tasks} big3Error={big3Error} />
+            <TodayFocus tasks={tasks} onMove={handleMoveWithUndo} onStartMorningPlan={() => setShowMorning(true)} />
+            <CarryoverBanner tasks={tasks} onMove={handleMoveWithUndo} onDelete={handleDeleteTask} />
+            {streak.days >= 3 && <StreakBadge stage={streakStage} />}
+            <ConsistencyProtectionBanner streak={streak} tasks={tasks} />
+            {tasks.length > 3 && (
+              <AntiNoisePanel
+                tasks={tasks}
+                onMove={handleMoveWithUndo}
+                onDelete={handleDeleteTask}
+                onEdit={setEditing}
+              />
+            )}
+          </div>
+        )}
 
         <div className="h-8" />
       </div>
 
       {/* Capacity warning confirmation */}
       {capacityWarning && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-4 bg-black/40">
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center p-4 bg-black/40">
           <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-2xl" dir="rtl">
             <p className="text-base font-black text-slate-800 mb-1">⚠️ חריגה מקיבולת היום</p>
             <p className="text-sm text-slate-600 mb-4">
@@ -1849,12 +2488,44 @@ export default function Weekly() {
         </div>
       )}
 
-      {/* T2-C: Morning Planning Modal */}
+      {/* Morning Ritual — manual trigger */}
       {showMorning && (
-        <MorningPlanModal
+        <MorningRitual
           onClose={() => setShowMorning(false)}
           onAdd={addTask}
-          addXP={awardXP}
+          onMove={handleMoveWithUndo}
+          tasks={tasks}
+          streakStage={streakStage}
+        />
+      )}
+      {/* Morning Ritual — auto trigger on first morning open */}
+      {!showMorning && showMorningRitual && !anyModalOpen && (
+        <MorningRitual
+          onClose={() => setShowMorningRitual(false)}
+          onAdd={addTask}
+          onMove={handleMoveWithUndo}
+          tasks={tasks}
+          streakStage={streakStage}
+        />
+      )}
+
+      {/* Evening Ritual — auto trigger 17:00–23:00, once per day */}
+      {/* Priority: Morning > Weekly Open > Evening — blocked when Weekly Open is pending */}
+      {!(editingTask || showClose || showMorning || showMorningRitual || showWeeklyOpen) && showEveningRitual && (
+        <EveningRitual
+          onClose={() => setShowEveningRitual(false)}
+          tasks={tasks}
+          streakStage={streakStage}
+        />
+      )}
+
+      {/* Weekly Open — auto trigger Sun/Mon before 17:00, once per week */}
+      {/* Higher priority than Evening Ritual — renders first */}
+      {!(editingTask || showClose || showMorning || showMorningRitual) && showWeeklyOpen && (
+        <WeeklyOpenModal
+          onClose={() => setShowWeeklyOpen(false)}
+          weekLabel={period.weekLabel}
+          weekId={currentWeekId}
         />
       )}
 
@@ -1868,6 +2539,7 @@ export default function Weekly() {
           onDeleteTask={handleDeleteTask}
           onCloseWeek={closeWeek}
           profile={profile}
+          weekIntent={weekIntent}
         />
       )}
 
@@ -1894,8 +2566,15 @@ export default function Weekly() {
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-8xl animate-bounce">✅</div>
           </div>
-          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-2xl shadow-2xl font-black text-lg animate-slide-up">
-            +10 XP 🔥
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-2xl shadow-2xl font-black text-lg animate-slide-up text-center">
+            <div>+10 XP 🔥</div>
+            {celebrationIntent && (
+              <>
+                <div className="mt-2 text-sm font-medium opacity-90">הבוקר אמרת:</div>
+                <div className="text-sm font-semibold opacity-95">"{celebrationIntent.length > 40 ? celebrationIntent.slice(0, 40) + '...' : celebrationIntent}"</div>
+                <div className="mt-1 text-sm font-black">עשית את זה.</div>
+              </>
+            )}
           </div>
         </div>
       )}

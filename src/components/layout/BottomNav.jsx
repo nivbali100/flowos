@@ -4,7 +4,7 @@ import { useStore } from '../../hooks/useStore.js'
 
 const NAV_ITEMS = [
   { path: '/profile',   label: 'פרופיל', icon: UserCircle },
-  { path: '/',          label: 'יומן',   icon: Map,         exact: true },
+  { path: '/journey',   label: 'יומן',   icon: Map },
   { path: '/goals',     label: 'יעדים',  icon: Target },
   { path: '/weekly',    label: 'שבוע',   icon: CheckSquare, badge: true },
   { path: '/dashboard', label: 'בית',    icon: Home },
@@ -18,7 +18,7 @@ export default function BottomNav() {
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50">
       {/* Gradient fade at top of nav */}
       <div className="h-4 bg-gradient-to-b from-transparent to-white/80 pointer-events-none" />
-      <div className="bg-white/96 backdrop-blur-lg border-t border-slate-200/80 shadow-[0_-4px_24px_rgba(0,0,0,0.06)]">
+      <div className="bg-white border-t border-slate-200/80 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] md:bg-white/96 md:backdrop-blur-lg">
         <div className="flex items-center justify-around px-1" style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
           {NAV_ITEMS.map(({ path, label, icon: Icon, exact, badge }) => (
             <NavLink

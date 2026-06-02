@@ -8,6 +8,9 @@ import { syncGoalsToSupabase, upsertCoach, syncTaskToSupabase, deleteTaskFromSup
 import { getAuthEmailSync } from '../lib/auth.js'
 import { XP_VALUES } from '../constants/app.js'
 import { emitTaskEvent, emitEvent, EVENT_TYPES } from '../utils/events.js'
+import { enqueueExecutionEvent, clearExecutionSyncCursor } from '../services/executionSync.js'
+import { makeExecutionEvent, getWeekId, EXECUTION_EVENT_TYPES as EET } from '../domain/executionSchema.js'
+import { useExecutionSync } from './useExecutionSync.js'
 
 /**
  * Resolve the coach email for Supabase operations.
@@ -268,6 +271,29 @@ function useStoreInternal() {
       if (!remoteTasks?.length) return
       setTasksState(remoteTasks)
       persist('flowos_tasks', remoteTasks)
+      // Emit synthetic task_created events so execution_events reflects the
+      // restored snapshot. applyTaskCreated is idempotent — safe to re-emit.
+      // Without this, tasks restored from flowos_tasks are invisible to Nivos.
+      const weekId = getWeekId()
+      remoteTasks.forEach(task => {
+        void enqueueExecutionEvent(makeExecutionEvent(
+          EET.TASK_CREATED,
+          {
+            task_id:      task.id,
+            title:        task.title        || '',
+            status:       task.status       || 'backlog',
+            priority:     task.priority     || null,
+            is_big_three: task.isBigThree   || false,
+            goal_ref:     task.goalRef      || null,
+            goal_type:    task.goalType     || null,
+            energy_level: task.energyLevel  || null,
+            touch_count:  task.touchCount   || 0,
+            source:       'synced',
+          },
+          email,
+          { taskId: task.id, weekId },
+        ))
+      })
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.email]) // intentionally only re-run when email changes
@@ -291,6 +317,40 @@ function useStoreInternal() {
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)
   }, [])
+
+  // ── Execution timeline sync (login restore + offline queue flush) ──────────
+  // onRestore: called after replay with the reconstituted FounderExecutionState.
+  // We use the replayed touchCount as the authoritative source — it counts actual
+  // deferral events, whereas localStorage may have stale/reset values.
+  const _onExecRestore = useCallback((execState, nivosState) => {
+    if (execState.eventCount === 0) return
+    console.log(
+      '[FlowOS:sync] timeline restored —', execState.eventCount, 'events',
+      '| trend:', nivosState.trend,
+      '| completion7d:', Math.round(nivosState.completionRate7d * 100) + '%'
+    )
+    // Backfill touchCount from replay into localStorage tasks (accurate avoidance detection)
+    setTasksState(prev => {
+      let changed = false
+      const patched = prev.map(t => {
+        const replayed = execState.tasks[t.id]
+        if (!replayed) return t
+        if (replayed.touchCount > (t.touchCount || 0)) {
+          changed = true
+          return { ...t, touchCount: replayed.touchCount }
+        }
+        return t
+      })
+      if (changed) {
+        persist('flowos_tasks', patched)
+        return patched
+      }
+      return prev
+    })
+  }, []) // setTasksState is stable; no deps needed
+
+  const _syncUserEmail = profile?.email || getAuthEmailSync() || null
+  useExecutionSync(_syncUserEmail, _onExecRestore)
 
   // ── Profile mutations ──────────────────────────────────────────────────────
   const updateStartingPoint = useCallback((field, value) => {
@@ -439,29 +499,67 @@ function useStoreInternal() {
       persist('flowos_tasks', next)
       return next
     })
-    // fire-and-forget sync + event
+    // fire-and-forget sync + events
     const email = getCoachEmail()
     syncTaskToSupabase(task, email)
     emitTaskEvent(EVENT_TYPES.TASK_CREATED, task, {}, email)
+    // Execution event — durable, dedup-safe, offline-queued
+    if (email) {
+      void enqueueExecutionEvent(makeExecutionEvent(EET.TASK_CREATED, {
+        task_id:      task.id,
+        title:        task.title,
+        status:       task.status,
+        priority:     task.priority,
+        is_big_three: task.isBigThree,
+        goal_ref:     task.goalRef  || null,
+        goal_type:    task.goalType || null,
+        energy_level: task.energyLevel || null,
+        touch_count:  0,
+        owner:        task.owner,
+        source:       task.source,
+      }, email, { taskId: task.id, weekId: getWeekId() }))
+    }
     return task
   }, [])
 
   const updateTask = useCallback((id, updates) => {
     let updatedTask = null
+    let prevTask    = null
     setTasksState(prev => {
-      const next = prev.map(t =>
+      prevTask    = prev.find(t => t.id === id) || null
+      const next  = prev.map(t =>
         t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
       )
       persist('flowos_tasks', next)
       updatedTask = next.find(t => t.id === id) || null
       return next
     })
-    // Side effect outside state updater — safe from StrictMode double-invocation
-    if (updatedTask) syncTaskToSupabase(updatedTask, getCoachEmail())
+    // Side effects outside state updater — safe from StrictMode double-invocation
+    const email = getCoachEmail()
+    if (updatedTask) syncTaskToSupabase(updatedTask, email)
+    // Execution event for task updates (skip purely cosmetic fields like updatedAt)
+    if (email && updatedTask && prevTask) {
+      const changedFields = Object.keys(updates).filter(k => k !== 'updatedAt' && updates[k] !== prevTask[k])
+      if (changedFields.length > 0) {
+        void enqueueExecutionEvent(makeExecutionEvent(EET.TASK_UPDATED, {
+          task_id:        id,
+          title:          updatedTask.title,
+          status:         updatedTask.status,
+          priority:       updatedTask.priority,
+          is_big_three:   updatedTask.isBigThree,
+          goal_ref:       updatedTask.goalRef  || null,
+          goal_type:      updatedTask.goalType || null,
+          changed_fields: changedFields,
+          prev_title:     updates.title != null ? prevTask.title : undefined,
+          prev_priority:  updates.priority != null ? prevTask.priority : undefined,
+        }, email, { taskId: id, weekId: getWeekId() }))
+      }
+    }
   }, [])
 
   // ── Big 3 — max 3 tasks marked as priority ─────────────────────────────────
   const setBigThree = useCallback((id, isBig3) => {
+    let affectedTask = null
     setTasksState(prev => {
       const currentCount = prev.filter(t => t.isBigThree && t.id !== id).length
       if (isBig3 && currentCount >= 3) return prev   // limit enforced — caller should show error
@@ -469,33 +567,56 @@ function useStoreInternal() {
         t.id === id ? { ...t, isBigThree: isBig3, updatedAt: new Date().toISOString() } : t
       )
       persist('flowos_tasks', next)
+      affectedTask = next.find(t => t.id === id) || null
       return next
     })
+    // Execution event outside state updater
+    const email = getCoachEmail()
+    if (email && affectedTask) {
+      void enqueueExecutionEvent(makeExecutionEvent(EET.BIG3_SET, {
+        task_id:      id,
+        title:        affectedTask.title,
+        is_big_three: isBig3,
+        week_id:      getWeekId(),
+      }, email, { taskId: id, weekId: getWeekId() }))
+    }
   }, [])
 
   const deleteTask = useCallback((id) => {
     // Capture email before state setter to avoid calling Supabase inside a React state updater
     const email = getCoachEmail()
+    let deletedTask = null
     setTasksState(prev => {
-      const next = prev.filter(t => t.id !== id)
+      deletedTask = prev.find(t => t.id === id) || null   // capture before filter
+      const next  = prev.filter(t => t.id !== id)
       persist('flowos_tasks', next)
       return next
     })
     // Fire-and-forget outside the state setter — safe from React batching issues
     deleteTaskFromSupabase(id, email)
-    // Capture deleted task title for the event (before it's gone from state)
     emitEvent(EVENT_TYPES.TASK_DELETED, { task_id: id }, email)
+    // Execution event — durable delete record (append-only, never removes the event)
+    if (email && deletedTask) {
+      void enqueueExecutionEvent(makeExecutionEvent(EET.TASK_DELETED, {
+        task_id: id,
+        title:   deletedTask.title,
+        status:  deletedTask.status,
+        week_id: getWeekId(),
+      }, email, { taskId: id, weekId: getWeekId() }))
+    }
   }, [])
 
   const moveTask = useCallback((id, newStatus) => {
     // Capture result of state update to check for XP/streak side effects after
     let movedTaskResult = null
     let nextTasksSnapshot = null
+    let prevStatus = null   // Fix: capture the pre-move status for accurate from_status events
 
     setTasksState(prev => {
       const now = new Date().toISOString()
       const next = prev.map(t => {
         if (t.id !== id) return t
+        prevStatus = t.status   // capture BEFORE update (idempotent across StrictMode double-calls)
         // Deferral detection: was in today/doing, moving away without completing
         const isDeferral =
           ['today', 'doing'].includes(t.status) &&
@@ -529,8 +650,7 @@ function useStoreInternal() {
     if (movedTaskResult) {
       syncTaskToSupabase(movedTaskResult, coachEmail)
 
-      // Behavioral events
-      const prevStatus = movedTaskResult.__prevStatus  // not available here — use newStatus logic
+      // Behavioral events (existing system)
       if (newStatus === 'done') {
         emitTaskEvent(EVENT_TYPES.TASK_COMPLETED, movedTaskResult, {}, coachEmail)
         if (movedTaskResult.isBigThree) {
@@ -539,11 +659,44 @@ function useStoreInternal() {
       } else if (newStatus === 'doing') {
         emitTaskEvent(EVENT_TYPES.FOCUS_SESSION_STARTED, movedTaskResult, {}, coachEmail)
       } else {
-        // Deferral: touch_count incremented in moveTask
         if ((movedTaskResult.touchCount || 0) > 0) {
           emitTaskEvent(EVENT_TYPES.TASK_DEFERRED, movedTaskResult, { to_status: newStatus }, coachEmail)
         } else {
           emitTaskEvent(EVENT_TYPES.TASK_MOVED, movedTaskResult, { to_status: newStatus }, coachEmail)
+        }
+      }
+
+      // Execution events — durable, dedup-safe, offline-queued
+      if (coachEmail) {
+        const weekId = getWeekId()
+        const basePayload = {
+          task_id:      movedTaskResult.id,
+          title:        movedTaskResult.title,
+          status:       newStatus,
+          priority:     movedTaskResult.priority,
+          is_big_three: movedTaskResult.isBigThree,
+          goal_ref:     movedTaskResult.goalRef   || null,
+          goal_type:    movedTaskResult.goalType  || null,
+          energy_level: movedTaskResult.energyLevel || null,
+          touch_count:  movedTaskResult.touchCount || 0,
+        }
+
+        if (newStatus === 'done') {
+          void enqueueExecutionEvent(makeExecutionEvent(EET.TASK_COMPLETED, {
+            ...basePayload,
+            completed_at:     movedTaskResult.completedAt || new Date().toISOString(),
+            doing_started_at: movedTaskResult.doingStartedAt || null,
+            actual_minutes:   movedTaskResult.actualMinutes  || null,
+            was_big_three:    movedTaskResult.isBigThree,
+          }, coachEmail, { taskId: movedTaskResult.id, weekId }))
+        } else {
+          const isDeferral = (movedTaskResult.touchCount || 0) > 0
+          void enqueueExecutionEvent(makeExecutionEvent(EET.TASK_MOVED, {
+            ...basePayload,
+            from_status: prevStatus || 'unknown',   // Fix: use captured prevStatus, not __prevStatus
+            to_status:   newStatus,
+            is_deferral: isDeferral,
+          }, coachEmail, { taskId: movedTaskResult.id, weekId }))
         }
       }
     }
@@ -578,13 +731,35 @@ function useStoreInternal() {
 
   // ── Restore a previously-deleted task (used by Undo Toast) ──────────────
   const restoreTask = useCallback((task) => {
+    const email = getCoachEmail()
+    let wasRestored = false
     setTasksState(prev => {
       // Don't restore if somehow still exists
       if (prev.some(t => t.id === task.id)) return prev
+      wasRestored = true
       const next = [task, ...prev]
       persist('flowos_tasks', next)
       return next
     })
+    // Sync to Supabase and emit execution event outside the state setter
+    // (React may call state setters twice in StrictMode — guard with wasRestored)
+    if (wasRestored && email) {
+      syncTaskToSupabase(task, email)
+      // Use TASK_REOPENED so the replay engine clears the deletedAt flag
+      void enqueueExecutionEvent(makeExecutionEvent(EET.TASK_REOPENED, {
+        task_id:           task.id,
+        title:             task.title,
+        status:            task.status,
+        priority:          task.priority,
+        is_big_three:      task.isBigThree || false,
+        goal_ref:          task.goalRef  || null,
+        goal_type:         task.goalType || null,
+        energy_level:      task.energyLevel || null,
+        touch_count:       task.touchCount || 0,
+        prev_completed_at: task.completedAt || null,
+        reason:            'undo_delete',
+      }, email, { taskId: task.id, weekId: getWeekId() }))
+    }
   }, [])
 
   // ── Reorder tasks (for within-column drag sort) ───────────────────────────
@@ -600,8 +775,14 @@ function useStoreInternal() {
     const idSet  = new Set(ids)
     const email  = getCoachEmail()
     let movedTasks = []
+    const prevStatuses = {}  // { taskId: prevStatus } — captured before update
+
     setTasksState(prev => {
       const now  = new Date().toISOString()
+      // Capture pre-move statuses for accurate from_status events
+      for (const t of prev) {
+        if (idSet.has(t.id)) prevStatuses[t.id] = t.status
+      }
       const next = prev.map(t =>
         idSet.has(t.id)
           ? { ...t, status: newStatus, updatedAt: now,
@@ -614,7 +795,45 @@ function useStoreInternal() {
       return next
     })
     // Side effects outside state updater
-    if (email) movedTasks.forEach(t => syncTaskToSupabase(t, email))
+    if (email) {
+      const weekId = getWeekId()
+      movedTasks.forEach(t => {
+        syncTaskToSupabase(t, email)
+        // Execution event for each bulk-moved task
+        if (newStatus === 'done') {
+          void enqueueExecutionEvent(makeExecutionEvent(EET.TASK_COMPLETED, {
+            task_id:          t.id,
+            title:            t.title,
+            status:           'done',
+            priority:         t.priority,
+            is_big_three:     t.isBigThree || false,
+            goal_ref:         t.goalRef  || null,
+            goal_type:        t.goalType || null,
+            energy_level:     t.energyLevel || null,
+            touch_count:      t.touchCount || 0,
+            completed_at:     t.completedAt || new Date().toISOString(),
+            doing_started_at: t.doingStartedAt || null,
+            actual_minutes:   t.actualMinutes  || null,
+            was_big_three:    t.isBigThree || false,
+          }, email, { taskId: t.id, weekId }))
+        } else {
+          void enqueueExecutionEvent(makeExecutionEvent(EET.TASK_MOVED, {
+            task_id:      t.id,
+            title:        t.title,
+            status:       newStatus,
+            priority:     t.priority,
+            is_big_three: t.isBigThree || false,
+            goal_ref:     t.goalRef  || null,
+            goal_type:    t.goalType || null,
+            energy_level: t.energyLevel || null,
+            touch_count:  t.touchCount || 0,
+            from_status:  prevStatuses[t.id] || 'unknown',
+            to_status:    newStatus,
+            is_deferral:  false,
+          }, email, { taskId: t.id, weekId }))
+        }
+      })
+    }
     // XP + streak for bulk-done
     if (newStatus === 'done') {
       ids.forEach(() => addXP(XP_VALUES.task_done))
@@ -733,8 +952,19 @@ function useStoreInternal() {
     const weekId    = `week-${now.slice(0, 10)}`  // e.g. "week-2026-05-28"
 
     let tasksToDelete = []
+    // Fix: capture real week counts before mutation (were hardcoded as 0 before)
+    let _completedCount = 0
+    let _totalTasks     = 0
+    let _big3Done       = 0
+    let _big3Total      = 0
 
     setTasksState(prev => {
+      // Capture pre-close counts from current state (authoritative for week_closed payload)
+      _completedCount = prev.filter(t => t.status === 'done').length
+      _totalTasks     = prev.filter(t => !t.archivedAt).length
+      _big3Total      = Math.min(prev.filter(t => t.isBigThree).length, 3)
+      _big3Done       = prev.filter(t => t.isBigThree && t.status === 'done').length
+
       const next = prev
         .filter(t => {
           // Hard-delete tasks the user decided to remove
@@ -775,13 +1005,34 @@ function useStoreInternal() {
     setXpState(getXP())
     setStreakState(getStreak())
 
-    // Behavioral event
+    // Behavioral event (existing system)
     emitEvent(EVENT_TYPES.WEEK_CLOSED, { week_id: weekId, decisions_count: Object.keys(decisions).length }, getCoachEmail())
+
+    // Execution event — durable week_closed record with full decision map
+    const execEmail = getCoachEmail()
+    if (execEmail) {
+      // Normalize decision keys: useStore uses 'next-week', schema uses 'next_week'
+      const normalizedDecisions = {}
+      for (const [tid, dec] of Object.entries(decisions)) {
+        normalizedDecisions[tid] = dec === 'next-week' ? 'next_week' : dec
+      }
+      void enqueueExecutionEvent(makeExecutionEvent(EET.WEEK_CLOSED, {
+        week_id:         weekId,
+        closed_at:       now,
+        completed_count: _completedCount,
+        total_tasks:     _totalTasks,
+        big3_done:       _big3Done,
+        big3_total:      _big3Total,
+        decisions:       normalizedDecisions,
+        main_win:        '',
+      }, execEmail, { weekId }))
+    }
   }, [])
 
   // ── Reset (for testing / re-onboarding) ───────────────────────────────────
   const resetAll = useCallback(() => {
     Object.keys(localStorage).filter(k => k.startsWith('flowos_')).forEach(k => localStorage.removeItem(k))
+    clearExecutionSyncCursor()   // also wipe exec queue + cursor
     setProfileState({})
     setQuarterlyState({})
     setMonthlyState({})

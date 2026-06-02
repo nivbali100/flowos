@@ -86,7 +86,7 @@ export default function TaskModal({ task, quarterly, monthly, period, big3Count,
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 px-3 pb-2 md:pb-0 md:px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/50 px-3 pb-2 md:pb-0 md:px-4" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85dvh] md:max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-100 shrink-0">

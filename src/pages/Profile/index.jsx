@@ -208,7 +208,36 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Version footer */}
+        {/* Build version — helps verify production is fresh on real device */}
+        <div className="bg-slate-900 rounded-xl px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">גרסת Build</span>
+            <span className="text-[10px] font-mono text-green-400 font-bold">{__BUILD_HASH__}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">נבנה ב</span>
+            <span className="text-[10px] font-mono text-slate-400">
+              {new Date(__BUILD_DATE__).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+          <button
+            onClick={async () => {
+              try {
+                const caches_ = await window.caches?.keys()
+                if (caches_) await Promise.all(caches_.map(k => window.caches.delete(k)))
+                if ('serviceWorker' in navigator) {
+                  const regs = await navigator.serviceWorker.getRegistrations()
+                  await Promise.all(regs.map(r => r.unregister()))
+                }
+              } catch {}
+              window.location.reload(true)
+            }}
+            className="w-full text-center text-[10px] font-bold text-slate-500 hover:text-white hover:bg-slate-700 rounded-lg py-1.5 transition-colors mt-1"
+          >
+            🔄 נקה Cache והטען מחדש
+          </button>
+        </div>
+
         <p className="text-center text-[11px] text-slate-300 pb-2">
           FlowOS · הפסגה · כל הנתונים נשמרים מקומית + ענן
         </p>

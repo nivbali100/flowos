@@ -15,7 +15,7 @@ const PRIORITY_META = {
 }
 
 // ─── Close Week Modal ─────────────────────────────────────────────────────────
-export default function CloseWeekModal({ tasks, period, onClose, onMoveTask, onDeleteTask, profile, onCloseWeek }) {
+export default function CloseWeekModal({ tasks, period, onClose, onMoveTask, onDeleteTask, profile, onCloseWeek, weekIntent }) {
   const [mainWin,    setMainWin]    = useState('')
   const [whatWorked, setWhatWorked] = useState('')   // retro: מה עבד
   const [whatChange, setWhatChange] = useState('')   // retro: מה לשנות
@@ -23,6 +23,7 @@ export default function CloseWeekModal({ tasks, period, onClose, onMoveTask, onD
   const [saving,     setSaving]     = useState(false) // guard against double-submit
   const [step,       setStep]       = useState(1)    // T3-D: 1=stats, 2=manage open tasks
   const [decisions,  setDecisions]  = useState({})   // T3-D: { taskId: 'next-week'|'backlog'|'delete' }
+  const [intentMet,  setIntentMet]  = useState(null)
 
   // Close on Escape (only step 1 — step 2 has decisions to make)
   useEffect(() => {
@@ -63,6 +64,7 @@ export default function CloseWeekModal({ tasks, period, onClose, onMoveTask, onD
       mainWin:        mainWin.trim(),
       whatWorked:     whatWorked.trim(),
       whatChange:     whatChange.trim(),
+      weekIntentMet:  intentMet,
     }
     try {
       const existing = JSON.parse(localStorage.getItem('flowos_weekly_summaries') || '[]')
@@ -112,7 +114,7 @@ export default function CloseWeekModal({ tasks, period, onClose, onMoveTask, onD
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 px-3 pb-2 md:pb-0 md:px-4" onClick={step === 1 ? onClose : undefined}>
+    <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/60 px-3 pb-2 md:pb-0 md:px-4" onClick={step === 1 ? onClose : undefined}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85dvh] md:max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
@@ -128,6 +130,12 @@ export default function CloseWeekModal({ tasks, period, onClose, onMoveTask, onD
 
         {/* Stats */}
         <div className="p-5 space-y-3 overflow-y-auto">
+          {weekIntent?.text && (
+            <div className="bg-slate-50 rounded-xl px-4 py-3 mb-3">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">כוונת השבוע</p>
+              <p className="text-sm font-bold text-slate-700">"{weekIntent.text}"</p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             {STAT_ROWS.map(row => (
               <div key={row.label} className="bg-slate-50 rounded-xl p-3">
@@ -151,6 +159,31 @@ export default function CloseWeekModal({ tasks, period, onClose, onMoveTask, onD
               className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-brand-200"
             />
           </div>
+
+          {/* Week intent closing question */}
+          {weekIntent?.text && (
+            <div>
+              <label className="text-xs font-bold text-slate-600 block mb-2">
+                הכוונה שהגדרת: "{weekIntent.text}" — הגעת?
+              </label>
+              <div className="flex gap-2">
+                {[
+                  { v: 'yes',     label: '✅ כן' },
+                  { v: 'partial', label: '⚡ חלקית' },
+                  { v: 'no',      label: '❌ לא' },
+                ].map(opt => (
+                  <button key={opt.v}
+                    onClick={() => setIntentMet(opt.v)}
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl border transition-colors ${
+                      intentMet === opt.v ? 'bg-slate-900 text-white border-slate-900' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Retrospective */}
           <div className="bg-brand-50 border border-brand-100 rounded-xl p-3 space-y-3">

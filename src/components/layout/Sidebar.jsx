@@ -18,7 +18,7 @@ const NAV_GROUPS = [
   {
     label: 'מערכת הניהול',
     items: [
-      { path: '/',          label: 'יומן מסע',     icon: Map, exact: true },
+      { path: '/journey',   label: 'יומן מסע',     icon: Map },
       { path: '/goals',     label: 'יעדים',         icon: Target },
       { path: '/daily',     label: 'ביצוע יומי',    icon: Flame, hint: 'מצב עבודה' },
       { path: '/weekly',    label: 'לוח שבועי',     icon: CheckSquare },
